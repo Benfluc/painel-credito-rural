@@ -1,0 +1,64 @@
+name: Atualizar dados do SICOR
+
+on:
+  schedule:
+    - cron: "17 9 * * *" # todo dia às 06:17 (Brasília)
+  workflow_dispatch:
+    inputs:
+      inicio:
+        description: "Ano inicial da coleta (SICOR começa em 2013)"
+        default: "2013"
+      refresh:
+        description: "Quantos meses recentes reconsultar"
+        default: "3"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: etl-sicor
+  cancel-in-progress: false
+
+jobs:
+  etl:
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Restaurar cache mensal do SICOR
+        uses: actions/cache/restore@v4
+        with:
+          path: .cache/sicor
+          key: sicor-${{ github.run_id }}
+          restore-keys: sicor-
+
+      - name: Coletar e agregar
+        run: |
+          python etl/sicor_etl.py \
+            --inicio "${{ github.event.inputs.inicio || '2013' }}" \
+            --refresh "${{ github.event.inputs.refresh || '3' }}" \
+            --cache .cache/sicor --out public/data
+
+      - name: Salvar cache (mesmo se a coleta falhar no meio)
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: .cache/sicor
+          key: sicor-${{ github.run_id }}
+
+      - name: Publicar dados novos
+        run: |
+          if git diff --quiet -- public/data ':!public/data/meta.json' && [ -z "$(git ls-files --others --exclude-standard public/data)" ]; then
+            echo "Sem dados novos."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/data
+          git commit -m "dados: atualização SICOR $(date -u +%Y-%m-%d)"
+          git push
