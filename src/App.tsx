@@ -24,11 +24,14 @@ import {
 import { useGeo } from "./lib/geo";
 import { brl, dataHora, fmtMetrica, ha, mesAno, MESES, NOME_METRICA, num, pct } from "./lib/format";
 import { COR_FIN } from "./lib/colors";
-import MapaBrasil from "./components/MapaBrasil";
+import MapaBrasil, { type Pintura } from "./components/MapaBrasil";
+import CreditoProducao, { fmtQL, LegendaQL } from "./components/CreditoProducao";
+import { anoPam as escolherAnoPam, carregarPam, carregarPamMeta, corQL, creditoAgricolaMun, culturasMun, pares, paresUF, producaoMun, type PamAno, type PamMeta } from "./lib/pam";
+import { COR_ZERO } from "./lib/colors";
 import MunicipioAoVivo from "./components/MunicipioAoVivo";
 import { BarraFiltros } from "./components/Filtros";
 import { BarrasEmpilhadas, FIN_NOMES, LegendaFin, serieMensal } from "./components/Graficos";
-import { BarrasH, Card, Segmentado, Skeleton } from "./components/ui";
+import { BarrasH, Card, Segmentado, Skeleton, Vazio } from "./components/ui";
 
 // ---------------------------------------------------------------- URL <-> estado
 function lerURL(): { f: Partial<Filtros>; geo: Geo } {
@@ -126,6 +129,19 @@ export default function App() {
   const [dados, setDados] = useState<DadosAno | null>(null);
   const [anterior, setAnterior] = useState<Tabela | null>(null);
   const base = useGeo();
+  const [pamMeta, setPamMeta] = useState<PamMeta | null>(null);
+  const [pam, setPam] = useState<PamAno | null>(null);
+  const [defasagem, setDefasagem] = useState<0 | 1>(0);
+  const [modoMapa, setModoMapa] = useState<"credito" | "ql">("credito");
+
+  useEffect(() => {
+    carregarPamMeta().then(setPamMeta);
+  }, []);
+  const anoP = useMemo(() => (pamMeta && f.ano ? escolherAnoPam(pamMeta, f.ano, defasagem) : { ano: null, exato: false }), [pamMeta, f.ano, defasagem]);
+  useEffect(() => {
+    setPam(null);
+    if (anoP.ano) carregarPam(anoP.ano).then(setPam).catch(() => setPam(null));
+  }, [anoP.ano]);
 
   useEffect(() => {
     Promise.all([carregar<Meta>("meta.json"), carregar<Tabela>("serie_anual.json")])
@@ -195,6 +211,51 @@ export default function App() {
   }, [dados, meta, geo.uf, nivelMun, vUF, vMunTodos, f.metrica, base]);
   const top = useMemo(() => [...ranking].sort((a, b) => b.v - a.v).slice(0, 12), [ranking]);
 
+  // ---------- crédito × produção (PAM) ----------
+  const cp = useMemo(() => {
+    if (!dados || !pam) return null;
+    const cred = creditoAgricolaMun(dados.mun, f, null);
+    const prodM = producaoMun(pam, null);
+    const br = pares(cred, prodM);
+    // estados: crédito da tabela por UF (completa mesmo quando o municipal é parcial)
+    const credUF = new Map<string, number>();
+    for (const [uf, x] of porUF(dados.uf, { ...f, at: 1 })) credUF.set(uf, x.v);
+    const prodUF = new Map<string, { v: number }>();
+    for (const [id, x] of paresUF(br.pares).pares) prodUF.set(id, { v: x.p });
+    const ufs = pares(credUF, prodUF);
+    const escopo = geo.uf
+      ? pares(
+          new Map([...cred].filter(([id]) => id.startsWith(geo.uf!))),
+          new Map([...prodM].filter(([id]) => id.startsWith(geo.uf!))),
+        )
+      : br;
+    return { br, ufs, escopo };
+  }, [dados, pam, f, geo.uf]);
+
+  const pintura = useMemo<Pintura | null>(() => {
+    if (modoMapa !== "ql" || !cp) return null;
+    const munRef = geo.uf ? cp.escopo.pares : cp.br.pares;
+    const par = (id: string) => (id.length === 2 ? cp.ufs.pares.get(id) : munRef.get(id));
+    return {
+      uf: (uf) => corQL(cp.ufs.pares.get(uf), COR_ZERO),
+      mun: (id) => corQL(munRef.get(id), COR_ZERO),
+      dica: (id) => {
+        const x = par(id);
+        return x ? { valor: `QL ${fmtQL(x.ql)}`, rotulo: `crédito ${brl(x.c)} · produção ${brl(x.p)}` } : { valor: "—", rotulo: "sem crédito e sem produção" };
+      },
+      legenda: <LegendaQL ref_={geo.uf ? meta?.ufs[geo.uf]?.sigla ?? "UF" : "Brasil"} />,
+    };
+  }, [modoMapa, cp, geo.uf, meta]);
+
+  // ---------- cobertura municipal (microdados só publicam município do crédito público) ----------
+  const cobMun = meta?.munCobertura?.[String(f.ano)];
+  const munParcial = !!cobMun && cobMun.v < 0.999;
+  const pct0 = (x: number) => `${Math.round(x * 100)}%`;
+  const avisoMun = munParcial
+    ? `Municípios: só operações com recursos públicos ou Proagro (${pct0(cobMun!.q)} dos contratos e ${pct0(cobMun!.v)} do valor de ${f.ano}).`
+    : undefined;
+  const mostrandoMun = !!(geo.uf || nivelMun || geo.mun);
+
   const contextoUF = geo.uf; // gráficos de BR/UF usam a UF mesmo com município selecionado
   const serieM = useMemo(() => (dados ? serieMensal(mensal(dados.uf, f, contextoUF), meses) : []), [dados, f, contextoUF, meses]);
   const hist = useMemo(() => (serieAnual ? historico(serieAnual, f, contextoUF).map((h) => ({ rotulo: String(h.ano), fins: h.fins })) : []), [serieAnual, f, contextoUF]);
@@ -255,6 +316,16 @@ export default function App() {
         </div>
       )}
 
+      {meta?.origem === "microdados" && !meta.amostra && (
+        <div className="mx-auto mb-3 flex max-w-[1400px] items-start gap-2 rounded-xl border border-sky-400/20 bg-sky-400/[0.06] px-4 py-2.5 text-xs text-sky-100/85">
+          <TriangleAlert size={14} className="mt-0.5 shrink-0" />
+          <span>
+            <b>Dados dos microdados do BCB.</b> Brasil e estados estão completos. No nível municipal, o BCB só publica o município das operações com recursos públicos ou Proagro
+            {cobMun ? ` — em ${f.ano}, ${pct0(cobMun.q)} dos contratos e ${pct0(cobMun.v)} do valor` : ""}. Os municípios ficam completos quando a API do SICOR voltar ao ar.
+          </span>
+        </div>
+      )}
+
       {meta && <BarraFiltros meta={meta} f={f} setF={setF} geo={geo} setGeo={setGeo} nomeMun={base?.nomeMun ?? new Map()} />}
 
       <main className="mx-auto mt-5 max-w-[1400px] space-y-5">
@@ -262,7 +333,7 @@ export default function App() {
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
           {kpi ? (
             <>
-              <Kpi i={0} rotulo={`Valor contratado · ${periodo}`} valor={brl(kpi.atual.v)} delta={kpi.prev && kpi.prev.v ? kpi.atual.v / kpi.prev.v - 1 : null} detalhe={kpi.prev ? "vs. ano anterior" : nomeGeo} />
+              <Kpi i={0} rotulo={`Valor contratado · ${periodo}`} valor={brl(kpi.atual.v)} delta={kpi.prev && kpi.prev.v ? kpi.atual.v / kpi.prev.v - 1 : null} detalhe={kpi.prev ? "vs. ano anterior" : geo.mun && munParcial ? "só crédito público/Proagro" : nomeGeo} />
               <Kpi i={1} rotulo="Contratos" valor={num(kpi.atual.q)} delta={kpi.prev && kpi.prev.q ? kpi.atual.q / kpi.prev.q - 1 : null} detalhe={kpi.prev ? "vs. ano anterior" : undefined} />
               <Kpi i={2} rotulo="Valor médio por contrato" valor={kpi.atual.q ? brl(kpi.atual.v / kpi.atual.q) : "—"} />
               <Kpi i={3} rotulo="Área financiada" valor={kpi.area ? ha(kpi.area) : "—"} detalhe={f.fins[0] || f.fins[1] ? "custeio + investimento" : "só custeio e investimento"} />
@@ -277,20 +348,34 @@ export default function App() {
         <div className="grid gap-5 lg:grid-cols-3">
           <Card
             className="lg:col-span-2"
-            titulo={`${NOME_METRICA[f.metrica]} · ${nomeGeo}`}
+            titulo={modoMapa === "ql" ? `Crédito agrícola × produção · ${nomeGeo}` : `${NOME_METRICA[f.metrica]} · ${nomeGeo}`}
             sub={geo.uf ? "Clique num município para a consulta ao vivo no BCB" : "Clique num estado para ver seus municípios"}
+            nota={mostrandoMun ? avisoMun : undefined}
             acao={
-              !geo.uf ? (
-                <Segmentado
-                  rotulo="Nível do mapa"
-                  valor={nivelMun ? "m" : "e"}
-                  onChange={(v) => setNivelMun(v === "m")}
-                  opcoes={[
-                    { v: "e", t: "Estados" },
-                    { v: "m", t: "Municípios" },
-                  ]}
-                />
-              ) : undefined
+              <div className="flex flex-wrap justify-end gap-2">
+                {pamMeta && pamMeta.anos.length > 0 && (
+                  <Segmentado
+                    rotulo="O que o mapa mostra"
+                    valor={modoMapa}
+                    onChange={setModoMapa}
+                    opcoes={[
+                      { v: "credito", t: "Crédito" },
+                      { v: "ql", t: "Crédito × Produção" },
+                    ]}
+                  />
+                )}
+                {!geo.uf && (
+                  <Segmentado
+                    rotulo="Nível do mapa"
+                    valor={nivelMun ? "m" : "e"}
+                    onChange={(v) => setNivelMun(v === "m")}
+                    opcoes={[
+                      { v: "e", t: "Estados" },
+                      { v: "m", t: "Municípios" },
+                    ]}
+                  />
+                )}
+              </div>
             }
           >
             <div className="h-[460px] sm:h-[540px]">
@@ -305,6 +390,7 @@ export default function App() {
                   nomesUF={meta!.ufs}
                   onUF={(uf) => setGeo({ uf, mun: null })}
                   onMun={(mun, uf) => setGeo({ uf, mun })}
+                  pintura={pintura}
                 />
               ) : (
                 <Skeleton className="h-full" />
@@ -314,7 +400,9 @@ export default function App() {
           <Card
             titulo={!geo.uf && !nivelMun ? "Ranking dos estados" : `Ranking dos municípios${geo.uf ? ` · ${meta?.ufs[geo.uf]?.sigla}` : ""}`}
             sub={`${NOME_METRICA[f.metrica]} · ${periodo}${f.metrica === "medio" && (geo.uf || nivelMun) ? " · mín. 5 contratos" : ""}`}
-            nota={ranking.length > 12 ? `Mostrando 12 de ${ranking.length.toLocaleString("pt-BR")}.` : undefined}
+            nota={
+              [ranking.length > 12 ? `Mostrando 12 de ${ranking.length.toLocaleString("pt-BR")}.` : "", (geo.uf || nivelMun) && avisoMun ? avisoMun : ""].filter(Boolean).join(" ") || undefined
+            }
           >
             {dados ? (
               <BarrasH
@@ -330,7 +418,16 @@ export default function App() {
         </div>
 
         {/* município ao vivo */}
-        {geo.mun && dados && <MunicipioAoVivo key={geo.mun} ibge={geo.mun} nome={nomeGeo ?? ""} uf={meta!.ufs[geo.mun.slice(0, 2)]?.sigla ?? ""} filtros={f} />}
+        {geo.mun && dados && (
+          <MunicipioAoVivo
+            key={geo.mun}
+            ibge={geo.mun}
+            nome={nomeGeo ?? ""}
+            uf={meta!.ufs[geo.mun.slice(0, 2)]?.sigla ?? ""}
+            filtros={f}
+            pam={pam && anoP.ano ? { ano: anoP.ano, culturas: culturasMun(pam, geo.mun) } : null}
+          />
+        )}
 
         {/* séries */}
         <div className="grid gap-5 lg:grid-cols-2">
@@ -347,6 +444,25 @@ export default function App() {
           </Card>
         </div>
 
+        {/* crédito × produção */}
+        {meta && pamMeta && pamMeta.anos.length > 0 && (
+          <CreditoProducao
+            meta={meta}
+            pamMeta={pamMeta}
+            pam={pam}
+            anoPam={anoP}
+            defasagem={defasagem}
+            setDefasagem={setDefasagem}
+            escopo={cp?.escopo ?? null}
+            prod={dados?.prod ?? null}
+            f={f}
+            geo={geo}
+            nomeMun={base?.nomeMun ?? new Map()}
+            onMun={(id) => setGeo({ uf: id.slice(0, 2), mun: id })}
+            avisoMun={avisoMun}
+          />
+        )}
+
         {/* quebras */}
         <div className="grid gap-5 lg:grid-cols-3">
           <Card titulo="Programas" sub={`${NOME_METRICA[f.metrica]} · ${nomeGeo}`} nota={f.pg >= 0 ? "O filtro de programa não se aplica a este gráfico." : undefined}>
@@ -356,7 +472,9 @@ export default function App() {
             {dados ? <BarrasH itens={fontes.filter((p) => p.v > 0)} fmt={fmt} cor="#45b675" /> : <Skeleton className="h-48" />}
           </Card>
           <Card titulo="Quem toma o crédito" sub={`Sexo do beneficiário · ${nomeContexto}`} nota="Pessoas jurídicas e registros sem sexo informado aparecem separados.">
-            {gen && meta ? (
+            {meta?.generoDisponivel === false ? (
+              <Vazio>O sexo do beneficiário não é publicado nos microdados do BCB. Volta a aparecer quando a API do SICOR estiver no ar.</Vazio>
+            ) : gen && meta ? (
               <BarrasH
                 itens={meta.sexos.map((n, i) => ({ k: String(i), nome: n, v: valorMetrica(gen.get(i), f.metrica) })).filter((x) => x.v > 0)}
                 fmt={fmt}
@@ -422,6 +540,9 @@ export default function App() {
             <p>
               <b className="text-white/85">Limites.</b> Programas e fontes foram agrupados para leitura. Municípios criados após 2020 podem aparecer no ranking sem polígono no mapa. Comparações entre anos não descontam a inflação. Os totais por UF conferem com a soma municipal publicada pelo BCB.
             </p>
+            <p className="md:col-span-3">
+              <b className="text-white/85">Crédito × produção.</b> O valor da produção vem da Produção Agrícola Municipal (PAM/IBGE, SIDRA tabela 5457, lavouras temporárias e permanentes). A comparação usa só o crédito de atividade agrícola e o quociente de localização (QL): QL acima de 1 indica que o município recebe uma fatia do crédito maior que sua fatia na produção. O QL mede proporção, não necessidade: municípios com muita lavoura de alto valor e pouco crédito podem se financiar com recursos próprios, cooperativas ou crédito fora do SNCR.
+            </p>
           </div>
         </Card>
       </main>
@@ -431,6 +552,10 @@ export default function App() {
           Feito por <b className="text-white/70">Lúcio Benfica</b> · dados abertos do{" "}
           <a className="underline decoration-white/20 hover:text-white" href={meta?.fonteUrl} target="_blank" rel="noreferrer">
             Banco Central do Brasil <ExternalLink size={10} className="inline" />
+          </a>{" "}
+          e do{" "}
+          <a className="underline decoration-white/20 hover:text-white" href="https://sidra.ibge.gov.br/tabela/5457" target="_blank" rel="noreferrer">
+            IBGE (PAM) <ExternalLink size={10} className="inline" />
           </a>
         </span>
         <a href="https://github.com/Benfluc" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 hover:text-white">

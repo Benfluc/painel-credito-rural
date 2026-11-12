@@ -8,7 +8,9 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "etl": "python3 etl/sicor_etl.py --out public/data"
+    "etl": "python3 etl/sicor_microdados_etl.py --out public/data",
+    "etl:api": "python3 etl/sicor_etl.py --out public/data --complementar",
+    "etl:pam": "python3 etl/pam_etl.py --out public/data"
   },
   "dependencies": {
     "framer-motion": "^11.18.2",

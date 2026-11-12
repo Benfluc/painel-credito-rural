@@ -22,6 +22,43 @@ contratos ou valor médio).
 - **URL compartilhável**: todo filtro fica na URL (`?ano=2025&uf=31&mun=3143302&at=1`)
 - Responsivo, tema escuro, respeita `prefers-reduced-motion`
 
+## Fontes do crédito: microdados + API
+
+| Workflow | Fonte | O que gera |
+|---|---|---|
+| `atualizar-microdados.yml` (diário) | [Microdados do SICOR](https://www.bcb.gov.br/estabilidadefinanceira/tabelas-credito-rural-proagro), arquivos `.gz` mensais | **Base principal**: Brasil e UFs completos (mês, finalidade, atividade, programa, fonte, produto, instituição) e municípios **parciais** |
+| `atualizar-dados.yml` (diário) | API OData do SICOR (Olinda) | Completa o que os microdados não trazem: município de **todas** as operações e sexo do beneficiário. Se a API estiver fora, termina em ~1 min |
+| `atualizar-pam.yml` (semanal) | IBGE SIDRA 5457 | Produção agrícola municipal |
+
+Os microdados públicos só trazem o município das operações com recursos públicos ou Proagro (arquivo
+`SICOR_COMPLEMENTO_OPERACAO_BASICA`). Em 2023, isso cobriu 78% dos contratos e 33% do valor; ficam de fora
+principalmente LCA e recursos livres não equalizados. O ETL grava essa cobertura por ano em `meta.munCobertura`, e o
+painel avisa sempre que mostra municípios. Quando a API volta, o workflow da API substitui os municípios pelos dados
+completos.
+
+Conferência: em 2023, os microdados batem com a API da Matriz no custeio de MG (R$ 29.409.567.821 contra
+R$ 29.409.567.815; 120.342 contratos nos dois) e nos totais nacionais (diferença de 0,001% no custeio, por registros
+posteriores).
+
+## Crédito × produção agrícola (PAM/IBGE)
+
+O painel cruza o crédito com a **Produção Agrícola Municipal** (IBGE, [SIDRA 5457](https://sidra.ibge.gov.br/tabela/5457)),
+que reúne lavouras temporárias e permanentes. A tabela 1612 tem só as temporárias e deixaria de fora café, laranja,
+banana e cacau.
+
+- **Mapa "Crédito × Produção"** com o quociente de localização:
+  QL = (crédito do município ÷ crédito da referência) ÷ (produção do município ÷ produção da referência).
+  A referência é o Brasil ou, com uma UF selecionada, a própria UF.
+- **Dispersão** crédito × produção por município (escala log), com a linha de QL = 1
+- **Indicadores**: R$ de crédito por R$ 100 produzidos, correlação de Spearman, % da produção em municípios sem crédito
+  agrícola e número de municípios com QL ≥ 2 ou < 0,5
+- **Por cultura**: fatia no valor da produção × fatia no custeio agrícola (soja, café, milho, cana…), com a
+  correspondência SICOR ↔ PAM definida em `etl/pam_etl.py`
+- Opção **"PAM do ano seguinte"**, porque o custeio de um ano financia em boa parte a safra colhida no seguinte
+
+Escolhas de método: só entra o crédito de **atividade agrícola**, porque a PAM não cobre pecuária. Os valores são
+nominais e do mesmo período. O QL mede proporção, não necessidade de crédito.
+
 ## Arquitetura
 
 ```mermaid
@@ -61,6 +98,8 @@ O dashboard mostra a data da última sincronização e avisa quando o BCB já pu
 | `prod_AAAA.json` | UF × finalidade × produto × atividade × programa | `Custeio/Invest/ComercRegiaoUFProduto` |
 | `if_AAAA.json` | UF × instituição × segmento × atividade × programa | `SegmentoIFRegiaoUF` |
 | `gen_AAAA.json` | UF × sexo × atividade × programa | `RegiaoUFGenero` |
+| `pam_AAAA.json` | município × cultura (área colhida, valor da produção) + total | IBGE SIDRA 5457 |
+| `pam_meta.json` | anos da PAM e correspondência de culturas SICOR ↔ PAM | — |
 
 Cada linha traz quantidade e valor para as 4 finalidades.
 
@@ -75,10 +114,13 @@ Cada linha traz quantidade e valor para as 4 finalidades.
    ```
 2. No GitHub, abra **Settings → Actions → General → Workflow permissions** e marque **Read and write permissions**
    (o ETL faz commit dos dados).
-3. Em **Actions → "Atualizar dados do SICOR" → Run workflow**, rode a primeira carga com `inicio = 2013`.
+3. Em **Actions → "Atualizar dados do SICOR (microdados)" → Run workflow**, rode a primeira carga com `inicio = 2013`
+   (cerca de 1,3 GB de arquivos do BCB; leva de 15 a 40 minutos).
    A carga completa leva de 1 a 3 horas, por causa da lentidão da API. Se cair no meio, rode de novo: o cache mensal
    continua de onde parou.
-4. Na [Vercel](https://vercel.com/new), importe o repositório. O preset **Vite** é detectado sozinho e não precisa de
+4. Em **Actions → "Atualizar dados da PAM (IBGE)" → Run workflow**, rode a carga da PAM. Ela leva alguns minutos e
+   depois roda toda segunda-feira.
+5. Na [Vercel](https://vercel.com/new), importe o repositório. O preset **Vite** é detectado sozinho e não precisa de
    variáveis de ambiente. Cada commit do ETL gera um novo deploy.
 
 > Antes da primeira carga, o painel funciona em **modo amostra**: são respostas reais do BCB gravadas para teste
@@ -118,5 +160,6 @@ React 18 · TypeScript · Vite · Tailwind CSS 4 · MapLibre GL · Recharts · F
 
 - Dados: **Banco Central do Brasil**, licença [ODbL](https://opendatacommons.org/licenses/odbl/)
 - Malha municipal: IBGE, via [tbrugz/geodata-br](https://github.com/tbrugz/geodata-br)
+- Produção agrícola: **IBGE**, Produção Agrícola Municipal (SIDRA 5457)
 - Respostas de amostra da API: gravadas pelo projeto [agrobr](https://github.com/bruno-portfolio/agrobr)
 - Código: MIT, © Lúcio Júnio Benfica Rosa

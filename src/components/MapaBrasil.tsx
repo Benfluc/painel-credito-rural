@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import maplibregl, { type Map as MLMap, type GeoJSONSource } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import type { GeoBase } from "../lib/geo";
@@ -20,6 +20,15 @@ interface Props {
   nomesUF: Record<string, { sigla: string; nome: string }>;
   onUF: (uf: string | null) => void;
   onMun: (mun: string | null, uf: string) => void;
+  /** Pintura alternativa (ex.: crédito × produção) — substitui cores, dica e legenda. */
+  pintura?: Pintura | null;
+}
+
+export interface Pintura {
+  uf: (uf: string) => string;
+  mun: (id: string) => string;
+  dica: (id: string) => { valor: string; rotulo: string };
+  legenda: ReactNode;
 }
 
 interface Hover {
@@ -28,15 +37,16 @@ interface Hover {
   titulo: string;
   sub: string;
   valor: string;
+  rotulo?: string;
 }
 
-export default function MapaBrasil({ geo, sel, nivelMun, valoresUF, valoresMun, metrica, nomesUF, onUF, onMun }: Props) {
+export default function MapaBrasil({ geo, sel, nivelMun, valoresUF, valoresMun, metrica, nomesUF, onUF, onMun, pintura }: Props) {
   const div = useRef<HTMLDivElement>(null);
   const mapa = useRef<MLMap | null>(null);
   const [pronto, setPronto] = useState(false);
   const [hover, setHover] = useState<Hover | null>(null);
-  const cb = useRef({ onUF, onMun, sel, nivelMun, valoresUF, valoresMun, metrica, nomesUF, geo });
-  cb.current = { onUF, onMun, sel, nivelMun, valoresUF, valoresMun, metrica, nomesUF, geo };
+  const cb = useRef({ onUF, onMun, sel, nivelMun, valoresUF, valoresMun, metrica, nomesUF, geo, pintura });
+  cb.current = { onUF, onMun, sel, nivelMun, valoresUF, valoresMun, metrica, nomesUF, geo, pintura };
 
   const mostrarMun = (nivelMun || !!sel.uf) && !!geo.mun && !!valoresMun;
 
@@ -89,12 +99,14 @@ export default function MapaBrasil({ geo, sel, nivelMun, valoresUF, valoresMun, 
       m.getCanvas().style.cursor = "pointer";
       m.setFilter("uf-hover", ["==", ["get", "uf"], uf]);
       const x = c.valoresUF.get(uf);
+      const d = c.pintura?.dica(uf);
       setHover({
         x: e.point.x,
         y: e.point.y,
         titulo: nomeUF(uf),
         sub: c.sel.uf === uf ? "Estado selecionado" : "Clique para detalhar os municípios",
-        valor: fmtMetrica(valorMetrica(x, c.metrica), c.metrica),
+        valor: d ? d.valor : fmtMetrica(valorMetrica(x, c.metrica), c.metrica),
+        rotulo: d?.rotulo,
       });
     });
     m.on("mouseleave", "uf-fill", () => {
@@ -176,12 +188,14 @@ export default function MapaBrasil({ geo, sel, nivelMun, valoresUF, valoresMun, 
       m.setFilter("mun-hover", ["==", ["get", "id"], id]);
       m.setFilter("uf-hover", ["==", ["get", "uf"], ""]);
       const x = c.valoresMun?.get(id);
+      const d = c.pintura?.dica(id);
       setHover({
         x: e.point.x,
         y: e.point.y,
         titulo: f.properties.name as string,
         sub: c.nomesUF[id.slice(0, 2)]?.sigla ?? "",
-        valor: fmtMetrica(valorMetrica(x, c.metrica), c.metrica),
+        valor: d ? d.valor : fmtMetrica(valorMetrica(x, c.metrica), c.metrica),
+        rotulo: d?.rotulo,
       });
     });
     m.on("mouseleave", "mun-fill", () => {
@@ -207,7 +221,7 @@ export default function MapaBrasil({ geo, sel, nivelMun, valoresUF, valoresMun, 
     for (const f of geo.uf.features) {
       const uf = f.properties.uf;
       const dentro = !sel.uf || sel.uf === uf;
-      const cor = mostrarMun ? "#151b19" : corDe(valorMetrica(valoresUF.get(uf), metrica), quebras);
+      const cor = mostrarMun ? "#151b19" : pintura ? pintura.uf(uf) : corDe(valorMetrica(valoresUF.get(uf), metrica), quebras);
       m.setFeatureState({ source: "uf", id: uf }, { c: cor, o: dentro ? 1 : 0.35 });
     }
     if (m.getSource("mun") && geo.mun) {
@@ -222,11 +236,11 @@ export default function MapaBrasil({ geo, sel, nivelMun, valoresUF, valoresMun, 
         for (const f of geo.mun.features) {
           const id = f.properties.id;
           if (sel.uf && !id.startsWith(sel.uf)) continue;
-          m.setFeatureState({ source: "mun", id }, { c: corDe(valorMetrica(valoresMun.get(id), metrica), quebras) });
+          m.setFeatureState({ source: "mun", id }, { c: pintura ? pintura.mun(id) : corDe(valorMetrica(valoresMun.get(id), metrica), quebras) });
         }
       }
     }
-  }, [pronto, geo, sel.uf, sel.mun, mostrarMun, valoresUF, valoresMun, metrica, quebras]);
+  }, [pronto, geo, sel.uf, sel.mun, mostrarMun, valoresUF, valoresMun, metrica, quebras, pintura]);
 
   // -------- enquadramento --------
   useEffect(() => {
@@ -264,7 +278,9 @@ export default function MapaBrasil({ geo, sel, nivelMun, valoresUF, valoresMun, 
       </div>
 
       {/* legenda */}
-      {legenda.quebras.length > 0 && (
+      {pintura ? (
+        <div className="absolute bottom-3 left-3 max-w-[calc(100%-1.5rem)] rounded-lg border border-white/10 bg-black/60 px-3 py-2 text-[11px] text-white/70 backdrop-blur">{pintura.legenda}</div>
+      ) : legenda.quebras.length > 0 && (
         <div className="absolute bottom-3 left-3 rounded-lg border border-white/10 bg-black/55 px-3 py-2 text-[11px] text-white/70 backdrop-blur">
           <div className="mb-1.5 font-medium text-white/85">
             {NOME_METRICA[metrica]} · {mostrarMun ? "municípios" : "estados"}
@@ -295,7 +311,7 @@ export default function MapaBrasil({ geo, sel, nivelMun, valoresUF, valoresMun, 
           <div className="font-semibold text-white">{hover.titulo}</div>
           <div className="text-white/50">{hover.sub}</div>
           <div className="mt-1 text-sm font-semibold tabular-nums text-emerald-300">{hover.valor}</div>
-          <div className="text-[10px] uppercase tracking-wide text-white/40">{NOME_METRICA[metrica]}</div>
+          <div className="text-[10px] uppercase tracking-wide text-white/40">{hover.rotulo ?? NOME_METRICA[metrica]}</div>
         </div>
       )}
     </div>

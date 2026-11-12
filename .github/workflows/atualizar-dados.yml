@@ -1,4 +1,8 @@
-name: Atualizar dados do SICOR
+name: Completar municípios pela API do SICOR
+
+# A base principal vem dos microdados (atualizar-microdados.yml). Este workflow usa a API OData
+# só para o que os microdados não trazem: municípios de todas as operações e sexo do beneficiário.
+# Se a API estiver fora do ar, termina em cerca de 1 minuto e tenta de novo no dia seguinte.
 
 on:
   schedule:
@@ -16,7 +20,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: etl-sicor
+  group: dados-sicor
   cancel-in-progress: false
 
 jobs:
@@ -43,7 +47,7 @@ jobs:
             --inicio "${{ github.event.inputs.inicio || '2013' }}" \
             --refresh "${{ github.event.inputs.refresh || '3' }}" \
             --cache .cache/sicor --out public/data \
-            --workers 2 --tempo-max 280
+            --workers 2 --tempo-max 280 --complementar
 
       - name: Salvar cache (mesmo se a coleta falhar no meio)
         if: always()
@@ -54,12 +58,13 @@ jobs:
 
       - name: Publicar dados novos
         run: |
-          if git diff --quiet -- public/data ':!public/data/meta.json' && [ -z "$(git ls-files --others --exclude-standard public/data)" ]; then
+          if git diff --quiet -- public/data && [ -z "$(git ls-files --others --exclude-standard public/data)" ]; then
             echo "Sem dados novos."
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add public/data
-          git commit -m "dados: atualização SICOR $(date -u +%Y-%m-%d)"
+          git commit -m "dados: municípios completos (API SICOR) $(date -u +%Y-%m-%d)"
+          git pull --rebase
           git push

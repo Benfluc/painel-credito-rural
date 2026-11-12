@@ -27,6 +27,11 @@ export interface Meta {
   fontes: string[];
   finalidades: string[];
   sexos: string[];
+  /** "microdados" quando a base veio dos arquivos .gz do BCB (API fora do ar). */
+  origem?: "api" | "microdados";
+  /** Fração do valor (v) e dos contratos (q) com município publicado, por ano. */
+  munCobertura?: Record<string, { v: number; q: number }>;
+  generoDisponivel?: boolean;
 }
 
 export type Metrica = "valor" | "contratos" | "medio";

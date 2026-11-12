@@ -1,0 +1,56 @@
+name: Atualizar dados do SICOR (microdados)
+
+# Fonte principal: arquivos de microdados que o BCB publica todo mês.
+# Não depende da API OData (Olinda). Termina em segundos quando não há arquivo novo.
+on:
+  schedule:
+    - cron: "23 11 * * *" # todo dia às 08:23 (Brasília)
+  workflow_dispatch:
+    inputs:
+      inicio:
+        description: "Ano inicial (os microdados começam em 2013)"
+        default: "2013"
+      forcar:
+        description: "Reprocessar mesmo sem arquivo novo no BCB (true/false)"
+        default: "false"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: dados-sicor
+  cancel-in-progress: false
+
+jobs:
+  microdados:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar DuckDB
+        run: pip install duckdb==1.*
+
+      - name: Baixar e agregar os microdados
+        run: |
+          python etl/sicor_microdados_etl.py \
+            --inicio "${{ github.event.inputs.inicio || '2013' }}" \
+            --out public/data --cache .cache/microdados \
+            ${{ github.event.inputs.forcar == 'true' && '--forcar' || '' }}
+
+      - name: Publicar dados novos
+        run: |
+          if git diff --quiet -- public/data && [ -z "$(git ls-files --others --exclude-standard public/data)" ]; then
+            echo "Sem dados novos."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/data
+          git commit -m "dados: microdados SICOR $(date -u +%Y-%m-%d)"
+          git pull --rebase
+          git push

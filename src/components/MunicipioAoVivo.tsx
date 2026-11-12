@@ -21,7 +21,19 @@ async function buscar(ibge: string, ano: number): Promise<{ d: RespostaMunicipio
   return { d: await consultarMunicipio(ibge, ano), via: "direto" };
 }
 
-export default function MunicipioAoVivo({ ibge, nome, uf, filtros }: { ibge: string; nome: string; uf: string; filtros: Filtros }) {
+export default function MunicipioAoVivo({
+  ibge,
+  nome,
+  uf,
+  filtros,
+  pam,
+}: {
+  ibge: string;
+  nome: string;
+  uf: string;
+  filtros: Filtros;
+  pam?: { ano: number; culturas: { k: string; nome: string; v: number; a: number }[] } | null;
+}) {
   const [estado, setEstado] = useState<Estado>({ s: "carregando" });
   const [tentativa, setTentativa] = useState(0);
 
@@ -130,6 +142,12 @@ export default function MunicipioAoVivo({ ibge, nome, uf, filtros }: { ibge: str
               <div>
                 <h3 className="mb-1.5 text-xs font-medium uppercase tracking-wide text-white/50">Investimento · principais itens</h3>
                 <BarrasH itens={visao.invest} fmt={(v) => brl(v)} cor={COR_FIN[1]} />
+              </div>
+            )}
+            {pam && pam.culturas.length > 0 && (
+              <div>
+                <h3 className="mb-1.5 text-xs font-medium uppercase tracking-wide text-white/50">Produção agrícola · PAM {pam.ano}</h3>
+                <BarrasH itens={pam.culturas.map((c) => ({ ...c, extra: c.a > 0 ? ha(c.a) : undefined }))} fmt={(v) => brl(v)} cor="#45b675" />
               </div>
             )}
           </div>

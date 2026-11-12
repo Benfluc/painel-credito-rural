@@ -164,9 +164,9 @@ class Fonte:
             skip += TOP
 
 
-def _get_json(url: str) -> dict:
+def _get_json(url: str, tentativas: int = MAX_TENTATIVAS) -> dict:
     ultimo_erro = None
-    for tentativa in range(1, MAX_TENTATIVAS + 1):
+    for tentativa in range(1, tentativas + 1):
         try:
             # urllib não guarda cookies: cada tentativa cai em qualquer nó do balanceador
             req = urllib.request.Request(url, headers={
@@ -184,12 +184,23 @@ def _get_json(url: str) -> dict:
                 return dados
         except (urllib.error.URLError, TimeoutError, ValueError, json.JSONDecodeError) as e:
             ultimo_erro = e
-            if tentativa == MAX_TENTATIVAS:
+            if tentativa == tentativas:
                 break
             espera = min(90, 2 ** tentativa) + random.random() * 2
-            log(f"  tentativa {tentativa}/{MAX_TENTATIVAS} falhou ({e}); nova tentativa em {espera:.0f}s")
+            log(f"  tentativa {tentativa}/{tentativas} falhou ({e}); nova tentativa em {espera:.0f}s")
             time.sleep(espera)
     raise RuntimeError(f"falha ao consultar {url}: {ultimo_erro}")
+
+
+def api_no_ar() -> bool:
+    """Consulta mínima (1 registro de jan/2013). Se nem ela responde, a API está fora."""
+    url = (f"{BASE_URL}/RegiaoUF?$format=json&$top=1&$filter="
+           + urllib.parse.quote("AnoEmissao eq '2013' and MesEmissao eq '01'", safe="(),'"))
+    try:
+        _get_json(url, tentativas=4)
+        return True
+    except RuntimeError:
+        return False
 
 
 def log(msg: str) -> None:
@@ -339,13 +350,22 @@ def coletar(fonte: Fonte, cache: Path, meses: list[tuple[int, int]], recentes: s
 
     inicio = time.time()
     limite = tempo_max_min * 60 if tempo_max_min > 0 else float("inf")
+    estado = {"falhas_seguidas": 0}
+    DISJUNTOR = 10  # falhas seguidas que indicam API fora do ar
 
     def rodar(t):
         chave, ano, mes, p = t
         if time.time() - inicio > limite:
             return None  # orçamento de tempo esgotado: fica para a próxima execução
+        if estado["falhas_seguidas"] >= DISJUNTOR:
+            return None  # API instável demais: para de insistir
         t0 = time.time()
-        dados = AGREGADORES[chave](fonte, ano, mes)
+        try:
+            dados = AGREGADORES[chave](fonte, ano, mes)
+        except Exception:
+            estado["falhas_seguidas"] += 1
+            raise
+        estado["falhas_seguidas"] = 0
         if dados is None:
             return f"{chave} {ano}-{mes:02d}: indisponível"
         dados["fetchedAt"] = dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")
@@ -366,7 +386,9 @@ def coletar(fonte: Fonte, cache: Path, meses: list[tuple[int, int]], recentes: s
                 log(f"  ERRO: {e}")
     if falhas:
         log(f"{falhas} consultas falharam; os meses ficam para a próxima execução")
-    if adiadas:
+    if adiadas and estado["falhas_seguidas"] >= DISJUNTOR:
+        log(f"API do SICOR instável ({DISJUNTOR} falhas seguidas): {adiadas} consultas adiadas para a próxima execução")
+    elif adiadas:
         log(f"Tempo-limite de {tempo_max_min:.0f} min atingido: {adiadas} consultas adiadas para a próxima execução")
 
 
@@ -492,6 +514,39 @@ def gerar_saidas(cache: Path, out: Path, anos: list[int], amostra: bool) -> None
     log(f"Saídas gravadas em {out} (último mês com dados: {ultimo})")
 
 
+def gerar_complemento(cache: Path, out: Path) -> None:
+    """Modo --complementar: grava municípios e sexo completos (da API) sobre a base dos microdados."""
+    meta_p = out / "meta.json"
+    meta = json.loads(meta_p.read_text("utf-8"))
+    H8 = ["qC", "vC", "qI", "vI", "qM", "vM", "qN", "vN"]
+    munF, genF = meta.setdefault("munFonte", {}), meta.setdefault("genFonte", {})
+    cob = meta.setdefault("munCobertura", {})
+    for ano_s, meses in meta.get("mesesPorAno", {}).items():
+        ano = int(ano_s)
+        dm = [ler_cache(caminho_cache(cache, "mun", ano, m)) for m in meses]
+        dg = [ler_cache(caminho_cache(cache, "gen", ano, m)) for m in meses]
+        if all(dm):
+            acc: dict = {}
+            for d in dm:
+                for row in d["rows"]:
+                    _somar(acc, tuple(row[:3]), row[3:])
+            _dump(out / f"mun_{ano}.json", {"h": ["ibge", "at", "pg"] + H8 + ["aC", "aI"],
+                                              "r": [list(k) + _arred(v, n_area=2) for k, v in sorted(acc.items())]})
+            munF[ano_s] = "api"
+            cob[ano_s] = {"v": 1.0, "q": 1.0}
+            log(f"{ano}: municípios completos gravados a partir da API")
+        if all(dg):
+            acc = {}
+            for d in dg:
+                for row in d["rows"]:
+                    _somar(acc, tuple(row[:4]), row[4:])
+            _dump(out / f"gen_{ano}.json", {"h": ["uf", "sexo", "at", "pg"] + H8,
+                                              "r": [list(k) + _arred(v) for k, v in sorted(acc.items())]})
+            genF[ano_s] = "api"
+    meta["generoDisponivel"] = bool(genF)
+    _dump(meta_p, meta)
+
+
 # --------------------------------------------------------------------------- #
 def main(argv=None) -> int:
     hoje = dt.date.today()
@@ -505,14 +560,26 @@ def main(argv=None) -> int:
     ap.add_argument("--workers", type=int, default=3)
     ap.add_argument("--tempo-max", type=float, default=0, help="minutos de coleta antes de parar e gerar as saídas (0 = sem limite)")
     ap.add_argument("--so-gerar", action="store_true", help="não consulta a API; só regenera as saídas do cache")
+    ap.add_argument("--complementar", action="store_true",
+                    help="coleta só municípios e sexo e completa a base gerada pelos microdados (sicor_microdados_etl.py)")
     a = ap.parse_args(argv)
 
     meses = [(y, m) for y in range(a.inicio, a.fim + 1) for m in range(1, 13)
              if (y, m) <= (hoje.year, hoje.month)]
     recentes = set(meses[-a.refresh:]) if a.refresh > 0 else set()
+    if a.complementar:
+        for k in [k for k in AGREGADORES if k not in ("mun", "gen")]:
+            del AGREGADORES[k]
     if not a.so_gerar:
-        coletar(Fonte(a.fixtures), a.cache, meses, recentes, a.workers, a.tempo_max)
-    gerar_saidas(a.cache, a.out, list(range(a.inicio, a.fim + 1)), amostra=a.fixtures is not None)
+        if not a.fixtures and not api_no_ar():
+            log("::warning::A API do SICOR (BCB) não está respondendo a consultas de dados (HTTP 500). "
+                "Nada foi coletado; a próxima execução agendada tenta de novo.")
+        else:
+            coletar(Fonte(a.fixtures), a.cache, meses, recentes, a.workers, a.tempo_max)
+    if a.complementar:
+        gerar_complemento(a.cache, a.out)
+    else:
+        gerar_saidas(a.cache, a.out, list(range(a.inicio, a.fim + 1)), amostra=a.fixtures is not None)
     return 0
 
 
