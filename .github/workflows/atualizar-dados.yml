@@ -42,7 +42,8 @@ jobs:
           python etl/sicor_etl.py \
             --inicio "${{ github.event.inputs.inicio || '2013' }}" \
             --refresh "${{ github.event.inputs.refresh || '3' }}" \
-            --cache .cache/sicor --out public/data
+            --cache .cache/sicor --out public/data \
+            --workers 2 --tempo-max 280
 
       - name: Salvar cache (mesmo se a coleta falhar no meio)
         if: always()

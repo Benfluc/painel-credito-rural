@@ -184,6 +184,8 @@ def _get_json(url: str) -> dict:
                 return dados
         except (urllib.error.URLError, TimeoutError, ValueError, json.JSONDecodeError) as e:
             ultimo_erro = e
+            if tentativa == MAX_TENTATIVAS:
+                break
             espera = min(90, 2 ** tentativa) + random.random() * 2
             log(f"  tentativa {tentativa}/{MAX_TENTATIVAS} falhou ({e}); nova tentativa em {espera:.0f}s")
             time.sleep(espera)
@@ -324,18 +326,24 @@ def gravar_cache(p: Path, dados) -> None:
     tmp.replace(p)
 
 
-def coletar(fonte: Fonte, cache: Path, meses: list[tuple[int, int]], recentes: set, workers: int) -> None:
+def coletar(fonte: Fonte, cache: Path, meses: list[tuple[int, int]], recentes: set, workers: int, tempo_max_min: float = 0) -> None:
     tarefas = []
-    for chave in AGREGADORES:
-        for ano, mes in meses:
+    # mais recentes primeiro: o painel ganha os anos atuais antes do histórico antigo
+    for ano, mes in sorted(meses, reverse=True):
+        for chave in AGREGADORES:
             p = caminho_cache(cache, chave, ano, mes)
             if p.exists() and (ano, mes) not in recentes:
                 continue
             tarefas.append((chave, ano, mes, p))
     log(f"{len(tarefas)} consultas a fazer ({len(meses)} meses × {len(AGREGADORES)} conjuntos, cache reaproveitado)")
 
+    inicio = time.time()
+    limite = tempo_max_min * 60 if tempo_max_min > 0 else float("inf")
+
     def rodar(t):
         chave, ano, mes, p = t
+        if time.time() - inicio > limite:
+            return None  # orçamento de tempo esgotado: fica para a próxima execução
         t0 = time.time()
         dados = AGREGADORES[chave](fonte, ano, mes)
         if dados is None:
@@ -344,16 +352,22 @@ def coletar(fonte: Fonte, cache: Path, meses: list[tuple[int, int]], recentes: s
         gravar_cache(p, dados)
         return f"{chave} {ano}-{mes:02d}: {len(dados['rows'])} linhas ({time.time() - t0:.1f}s)"
 
-    falhas = 0
+    falhas = adiadas = 0
     with cf.ThreadPoolExecutor(max_workers=workers) as ex:
         for fut in cf.as_completed([ex.submit(rodar, t) for t in tarefas]):
             try:
-                log("  " + fut.result())
+                r = fut.result()
+                if r is None:
+                    adiadas += 1
+                    continue
+                log("  " + r)
             except Exception as e:  # um mês com falha não derruba o lote
                 falhas += 1
                 log(f"  ERRO: {e}")
     if falhas:
         log(f"{falhas} consultas falharam; os meses ficam para a próxima execução")
+    if adiadas:
+        log(f"Tempo-limite de {tempo_max_min:.0f} min atingido: {adiadas} consultas adiadas para a próxima execução")
 
 
 # --------------------------------------------------------------------------- #
@@ -489,6 +503,7 @@ def main(argv=None) -> int:
     ap.add_argument("--out", type=Path, default=Path("public/data"))
     ap.add_argument("--fixtures", type=Path, help="diretório com respostas gravadas {Entidade}_{AAAA}_{MM}.json.gz")
     ap.add_argument("--workers", type=int, default=3)
+    ap.add_argument("--tempo-max", type=float, default=0, help="minutos de coleta antes de parar e gerar as saídas (0 = sem limite)")
     ap.add_argument("--so-gerar", action="store_true", help="não consulta a API; só regenera as saídas do cache")
     a = ap.parse_args(argv)
 
@@ -496,7 +511,7 @@ def main(argv=None) -> int:
              if (y, m) <= (hoje.year, hoje.month)]
     recentes = set(meses[-a.refresh:]) if a.refresh > 0 else set()
     if not a.so_gerar:
-        coletar(Fonte(a.fixtures), a.cache, meses, recentes, a.workers)
+        coletar(Fonte(a.fixtures), a.cache, meses, recentes, a.workers, a.tempo_max)
     gerar_saidas(a.cache, a.out, list(range(a.inicio, a.fim + 1)), amostra=a.fixtures is not None)
     return 0
 
