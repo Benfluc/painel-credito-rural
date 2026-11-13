@@ -71,7 +71,7 @@ export default function FichaMunicipio(p: Props) {
       <div className="mt-5 grid gap-6 md:grid-cols-3">
         <div>
           <h3 className="mb-1.5 text-xs font-medium uppercase tracking-wide text-stone-500">Por programa · {NOME_METRICA[p.metrica].toLowerCase()}</h3>
-          <BarrasH itens={p.programas.filter((i) => i.v > 0)} fmt={fmt} cor="#2a78d6" />
+          <BarrasH itens={p.programas.filter((i) => i.v > 0)} fmt={fmt} cor="#2f8f57" />
         </div>
         <div>
           <h3 className="mb-1.5 text-xs font-medium uppercase tracking-wide text-stone-500">Agrícola × pecuária</h3>

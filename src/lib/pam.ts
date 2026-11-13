@@ -203,15 +203,15 @@ export function culturasMun(pam: PamAno, ibge: string, n = 6): { k: string; nome
 }
 
 // ---------------------------------------------------------------- cores do QL
-// Divergente azul ↔ vermelho com meio neutro (dataviz): azul = crédito abaixo da fatia na produção.
+// Divergente marrom ↔ verde com meio neutro: marrom = crédito abaixo da fatia na produção, verde = acima.
 export const CLASSES_QL = [
-  { ate: 0.25, cor: "#184f95", rotulo: "< 0,25" },
-  { ate: 0.5, cor: "#3987e5", rotulo: "0,25–0,5" },
-  { ate: 0.8, cor: "#9ec5f4", rotulo: "0,5–0,8" },
+  { ate: 0.25, cor: "#8c510a", rotulo: "< 0,25" },
+  { ate: 0.5, cor: "#bf812d", rotulo: "0,25–0,5" },
+  { ate: 0.8, cor: "#e6c98f", rotulo: "0,5–0,8" },
   { ate: 1.25, cor: "#f0efec", rotulo: "0,8–1,25" },
-  { ate: 2, cor: "#f3a7a6", rotulo: "1,25–2" },
-  { ate: 4, cor: "#e34948", rotulo: "2–4" },
-  { ate: Infinity, cor: "#a52a2a", rotulo: "> 4" },
+  { ate: 2, cor: "#9fd3a8", rotulo: "1,25–2" },
+  { ate: 4, cor: "#3e9b5f", rotulo: "2–4" },
+  { ate: Infinity, cor: "#14572f", rotulo: "> 4" },
 ];
 
 export function corQL(x: Par | undefined, zero: string): string {

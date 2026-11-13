@@ -75,10 +75,10 @@ export function BarrasEmpilhadas({ serie, fins, metrica, altura = 240 }: { serie
         <BarChart data={dados} margin={{ top: 6, right: 4, left: 4, bottom: 0 }} barCategoryGap="22%">
           <CartesianGrid vertical={false} stroke="#e7e6e1" strokeDasharray="0" />
           <XAxis dataKey="rotulo" tick={{ fill: "#6b6a64", fontSize: 11 }} axisLine={{ stroke: "#d4d3cc" }} tickLine={false} />
-          <YAxis tick={{ fill: "#6b6a64", fontSize: 11 }} axisLine={false} tickLine={false} width={48} tickFormatter={(v) => eixo(v)} />
+          <YAxis tick={{ fill: "#6b6a64", fontSize: 11 }} axisLine={false} tickLine={false} width={58} tickFormatter={(v) => eixo(v)} />
           <Tooltip content={<Dica metrica={metrica} fins={fins} />} cursor={{ fill: "rgba(255,255,255,0.04)" }} />
           {metrica === "medio" ? (
-            <Bar dataKey="total" fill="#2a78d6" radius={[4, 4, 0, 0]} maxBarSize={56} />
+            <Bar dataKey="total" fill="#2f8f57" radius={[4, 4, 0, 0]} maxBarSize={56} />
           ) : (
             ativos.map((c, i) => (
               <Bar

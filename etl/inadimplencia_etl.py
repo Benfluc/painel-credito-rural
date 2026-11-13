@@ -23,6 +23,7 @@ Uso:
 from __future__ import annotations
 
 import argparse
+import codecs
 import csv
 import datetime as dt
 import io
@@ -110,7 +111,12 @@ def baixar(url: str, destino: Path, tentativas: int = 4) -> None:
             t0 = time.time()
             tmp = destino.with_suffix(".part")
             with _get(url) as r, open(tmp, "wb") as fh:
+                esperado = int(r.headers.get("Content-Length") or 0)
                 shutil.copyfileobj(r, fh, 1 << 20)
+            if esperado and tmp.stat().st_size != esperado:
+                raise IOError(f"download incompleto ({tmp.stat().st_size} de {esperado} bytes)")
+            if not zipfile.is_zipfile(tmp):
+                raise IOError("o arquivo recebido não é um zip válido")
             tmp.replace(destino)
             log(f"    {destino.name}: {destino.stat().st_size / 1e6:.1f} MB em {time.time() - t0:.0f}s")
             return
@@ -129,12 +135,17 @@ def linhas_csv(zf: zipfile.ZipFile, nome: str):
     with zf.open(nome) as fh:
         amostra = fh.read(1 << 16)
     try:
-        amostra.decode("utf-8")
+        # o corte da amostra pode cair no meio de um caractere multibyte: o decodificador
+        # incremental ignora o pedaço incompleto do fim em vez de acusar erro
+        codecs.getincrementaldecoder("utf-8")().decode(amostra, final=False)
         enc = "utf-8-sig"
     except UnicodeDecodeError:
         enc = "latin-1"
     fh = io.TextIOWrapper(zf.open(nome), encoding=enc, errors="replace", newline="")
     cab = next(csv.reader([fh.readline()], delimiter=";"))
+    # remove marcador BOM mesmo quando ele chega como texto ("\ufeff" ou "ï»¿")
+    if cab:
+        cab[0] = cab[0].lstrip("\ufeff").replace("ï»¿", "")
     yield cab
     for linha in fh:
         # filtro barato antes do parse: só linhas da modalidade rural interessam
@@ -166,7 +177,8 @@ def processar_zip(caminho: Path, dic: dict) -> tuple[dict, dict, dict]:
             i_porte, i_orig, i_seg = col("porte"), col("origem"), col("segmento")
             i_med = [col(m) for m in MEDIDAS]
             if None in (i_db, i_uf, i_cli, i_mod) or i_med[0] is None or i_med[1] is None:
-                log(f"    {nome}: cabeçalho inesperado {cab[:20]}; arquivo ignorado")
+                log(f"    {nome}: cabeçalho inesperado {cab}; arquivo ignorado")
+                diag.setdefault("ignorados", []).append(nome)
                 continue
             n_rural = 0
             for row in leitor:
@@ -272,14 +284,25 @@ def main(argv=None) -> int:
                 log(f"{ano}: sem mudança no BCB, reaproveitando o agregado")
                 continue
             log(f"{ano}: baixando…")
-            baixar(URL_SCR.format(ano=ano), zipp)
+            try:
+                baixar(URL_SCR.format(ano=ano), zipp)
+            except Exception as e:  # noqa: BLE001
+                log(f"::warning::{ano}: não foi possível baixar ({e}); o ano fica para a próxima execução")
+                continue
             versoes[str(ano)] = v
         elif not zipp.exists():
             continue
         log(f"{ano}: processando…")
-        acc_uf, acc_dim, diag = processar_zip(zipp, dic)
+        try:
+            acc_uf, acc_dim, diag = processar_zip(zipp, dic)
+        except zipfile.BadZipFile as e:
+            log(f"::warning::{ano}: zip inválido ({e}); o ano fica para a próxima execução")
+            versoes.pop(str(ano), None)
+            continue
         _dump(agg_p, {"uf": [list(k) + v for k, v in acc_uf.items()], "dim": [list(k) + v for k, v in acc_dim.items()]})
         diagnostico[str(ano)] = diag
+        if diag.get("ignorados"):
+            versoes.pop(str(ano), None)  # força reprocessar o ano na próxima execução
         if not a.dir_local:
             zipp.unlink(missing_ok=True)  # o agregado basta; libera disco no runner
 

@@ -142,6 +142,11 @@ export default function CreditoProducao({ meta, pamMeta, pam, anoPam, defasagem,
         </>
       }
     >
+      {!anoPam.exato && anoPam.ano && (
+        <div className="mb-4 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-xs text-stone-700">
+          A PAM {f.ano + defasagem} ainda não foi publicada pelo IBGE. A comparação usa a PAM {anoPam.ano}, a mais recente disponível.
+        </div>
+      )}
       {avisoMun && (
         <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
           <b>Atenção:</b> {avisoMun} Como o crédito com recursos livres e LCA não equalizada fica de fora, o QL municipal subestima o crédito em regiões de agricultura empresarial. Os indicadores
@@ -200,10 +205,10 @@ export default function CreditoProducao({ meta, pamMeta, pam, anoPam, defasagem,
           <h3 className="mb-1 text-xs font-medium uppercase tracking-wide text-stone-500">Fatia de cada cultura · {nomeEscopo}</h3>
           <div className="mb-3 flex gap-4 text-[11px] text-stone-600">
             <span className="flex items-center gap-1.5">
-              <i className="h-2 w-2 rounded-sm bg-[#2a78d6]" /> no valor da produção
+              <i className="h-2 w-2 rounded-sm bg-[#eda100]" /> no valor da produção
             </span>
             <span className="flex items-center gap-1.5">
-              <i className="h-2 w-2 rounded-sm bg-[#2a78d6]" /> no custeio agrícola
+              <i className="h-2 w-2 rounded-sm bg-[#1baf7a]" /> no custeio agrícola
             </span>
           </div>
           {culturas.length ? (
@@ -218,10 +223,10 @@ export default function CreditoProducao({ meta, pamMeta, pam, anoPam, defasagem,
                   </div>
                   <div className="space-y-[2px]">
                     <div className="h-1.5 rounded-full bg-stone-100">
-                      <div className="h-full rounded-full bg-[#2a78d6]" style={{ width: `${(c.shareP / maxShare) * 100}%` }} />
+                      <div className="h-full rounded-full bg-[#eda100]" style={{ width: `${(c.shareP / maxShare) * 100}%` }} />
                     </div>
                     <div className="h-1.5 rounded-full bg-stone-100">
-                      <div className="h-full rounded-full bg-[#2a78d6]" style={{ width: `${(c.shareC / maxShare) * 100}%` }} />
+                      <div className="h-full rounded-full bg-[#1baf7a]" style={{ width: `${(c.shareC / maxShare) * 100}%` }} />
                     </div>
                   </div>
                 </li>

@@ -463,7 +463,7 @@ export default function App() {
           <Card
             className="lg:col-span-2"
             titulo={modoMapa === "ql" ? `Crédito agrícola × produção · ${nomeGeo}` : `${NOME_METRICA[f.metrica]} · ${nomeGeo}`}
-            sub={geo.uf ? "Clique num município para a consulta ao vivo no BCB" : "Clique num estado para ver seus municípios"}
+            sub={geo.uf ? "Clique num município para abrir a ficha · para voltar, afaste o zoom, clique fora do mapa ou use ← Brasil" : "Clique num estado para ver seus municípios"}
             nota={mostrandoMun ? avisoMun : undefined}
             acao={
               <div className="flex flex-wrap justify-end gap-2">
@@ -598,10 +598,10 @@ export default function App() {
         {/* quebras */}
         <div className="grid gap-5 lg:grid-cols-3">
           <Card titulo="Programas" sub={`${NOME_METRICA[f.metrica]} · ${nomeGeo}`} nota={f.pg >= 0 ? "O filtro de programa não se aplica a este gráfico." : undefined}>
-            {dados ? <BarrasH itens={programas.filter((p) => p.v > 0)} fmt={fmt} cor="#2a78d6" ativo={f.pg >= 0 ? String(f.pg) : null} onClick={(k) => setF({ ...f, pg: f.pg === Number(k) ? -1 : Number(k) })} /> : <Skeleton className="h-48" />}
+            {dados ? <BarrasH itens={programas.filter((p) => p.v > 0)} fmt={fmt} cor="#2f8f57" ativo={f.pg >= 0 ? String(f.pg) : null} onClick={(k) => setF({ ...f, pg: f.pg === Number(k) ? -1 : Number(k) })} /> : <Skeleton className="h-48" />}
           </Card>
           <Card titulo="Fontes de recursos" sub={`${NOME_METRICA[f.metrica]} · ${nomeContexto}`} nota={geo.mun ? "A fonte de recursos é publicada por UF; o gráfico mostra o estado do município." : undefined}>
-            {dados ? <BarrasH itens={fontes.filter((p) => p.v > 0)} fmt={fmt} cor="#2a78d6" /> : <Skeleton className="h-48" />}
+            {dados ? <BarrasH itens={fontes.filter((p) => p.v > 0)} fmt={fmt} cor="#2f8f57" /> : <Skeleton className="h-48" />}
           </Card>
           <Card titulo="Quem toma o crédito" sub={`Sexo do beneficiário · ${nomeContexto}`} nota="Pessoas jurídicas e registros sem sexo informado aparecem separados.">
             {meta?.generoDisponivel === false ? (
@@ -610,7 +610,7 @@ export default function App() {
               <BarrasH
                 itens={meta.sexos.map((n, i) => ({ k: String(i), nome: n, v: valorMetrica(gen.get(i), f.metrica) })).filter((x) => x.v > 0)}
                 fmt={fmt}
-                cor="#2a78d6"
+                cor="#2f8f57"
               />
             ) : (
               <Skeleton className="h-32" />
@@ -624,7 +624,7 @@ export default function App() {
               <BarrasH
                 itens={prods.map((p) => ({ k: `${p.fin}${p.nome}`, nome: p.nome.charAt(0) + p.nome.slice(1).toLowerCase(), v: f.metrica === "contratos" ? p.q : p.v, extra: FIN_NOMES[p.fin] }))}
                 fmt={(v) => (f.metrica === "contratos" ? num(v) : brl(v))}
-                cor="#2a78d6"
+                cor="#2f8f57"
               />
             ) : (
               <Skeleton className="h-72" />
@@ -633,7 +633,7 @@ export default function App() {
           <Card titulo="Instituições financeiras" sub={`Maiores concedentes · ${nomeContexto} · ${periodo}`}>
             {ifs ? (
               <>
-                <BarrasH itens={ifs.top.map((x, i) => ({ k: String(i) + x.nome, nome: x.nome, v: f.metrica === "contratos" ? x.q : f.metrica === "medio" ? (x.q ? x.v / x.q : 0) : x.v, extra: x.segmento }))} fmt={fmt} cor="#2a78d6" />
+                <BarrasH itens={ifs.top.map((x, i) => ({ k: String(i) + x.nome, nome: x.nome, v: f.metrica === "contratos" ? x.q : f.metrica === "medio" ? (x.q ? x.v / x.q : 0) : x.v, extra: x.segmento }))} fmt={fmt} cor="#2f8f57" />
                 {ifs.segmentos.length > 0 && (
                   <div className="mt-4 border-t border-stone-200 pt-3">
                     <div className="mb-2 text-[11px] uppercase tracking-wide text-stone-500">Por segmento</div>

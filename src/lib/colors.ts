@@ -1,11 +1,12 @@
 // Cores por função (método dataviz): categórica em ordem fixa, sequencial de um só matiz.
 
-/** Finalidades — slots categóricos 1–4 do modo claro (validados: CVD ΔE ≥ 9,1 entre vizinhos). */
-export const COR_FIN = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100"];
+/** Finalidades — slots da paleta clara, ordem validada (CVD e visão normal ok entre vizinhos):
+ *  custeio verde-água, investimento laranja, comercialização azul, industrialização dourado. */
+export const COR_FIN = ["#1baf7a", "#eb6834", "#2a78d6", "#eda100"];
 
-/** Rampa sequencial azul (claro = pouco, escuro = muito), passos 100–700 da paleta de referência. */
-export const RAMPA = ["#cde2fb", "#9ec5f4", "#6da7ec", "#3987e5", "#256abf", "#184f95", "#0d366b"];
-export const COR_ZERO = "#e2e1db";
+/** Rampa sequencial verde (claro = pouco, escuro = muito). */
+export const RAMPA = ["#e6f4ea", "#c4e6cf", "#94d1aa", "#5fb684", "#36985f", "#1e7a45", "#0f5a31"];
+export const COR_ZERO = "#d9d8d2";
 
 /** Quebras por quantis (n classes) dos valores positivos. */
 export function quebrasQuantis(valores: number[], n = RAMPA.length): number[] {

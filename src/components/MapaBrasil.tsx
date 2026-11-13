@@ -6,7 +6,7 @@ import type { Geo, Metrica, QV } from "../lib/data";
 import { valorMetrica } from "../lib/data";
 import { COR_ZERO, RAMPA, corDe, quebrasQuantis } from "../lib/colors";
 import { fmtMetrica, NOME_METRICA } from "../lib/format";
-import { Minus, Plus, RotateCcw } from "lucide-react";
+import { ArrowLeft, Minus, Plus, RotateCcw } from "lucide-react";
 
 const BR: [number, number, number, number] = [-74.5, -34.2, -32.5, 5.6];
 
@@ -45,6 +45,7 @@ export default function MapaBrasil({ geo, sel, nivelMun, valoresUF, valoresMun, 
   const mapa = useRef<MLMap | null>(null);
   const [pronto, setPronto] = useState(false);
   const [hover, setHover] = useState<Hover | null>(null);
+  const zoomAlvo = useRef<number | null>(null);
   const cb = useRef({ onUF, onMun, sel, nivelMun, valoresUF, valoresMun, metrica, nomesUF, geo, pintura });
   cb.current = { onUF, onMun, sel, nivelMun, valoresUF, valoresMun, metrica, nomesUF, geo, pintura };
 
@@ -73,7 +74,8 @@ export default function MapaBrasil({ geo, sel, nivelMun, valoresUF, valoresMun, 
         source: "uf",
         paint: { "fill-color": ["coalesce", ["feature-state", "c"], COR_ZERO], "fill-opacity": ["coalesce", ["feature-state", "o"], 1] },
       });
-      m.addLayer({ id: "uf-line", type: "line", source: "uf", paint: { "line-color": "#f4f5f1", "line-width": 1.2 } });
+      m.addLayer({ id: "uf-line", type: "line", source: "uf", paint: { "line-color": "#ffffff", "line-width": 1.2 } });
+      m.addLayer({ id: "uf-contorno", type: "line", source: "uf", paint: { "line-color": "#a9a89f", "line-width": 0.6 } });
       m.addLayer({
         id: "uf-hover",
         type: "line",
@@ -85,6 +87,17 @@ export default function MapaBrasil({ geo, sel, nivelMun, valoresUF, valoresMun, 
     });
 
     const nomeUF = (uf: string) => cb.current.nomesUF[uf]?.nome ?? uf;
+    const voltar = () => {
+      const c = cb.current;
+      if (c.sel.mun && c.sel.uf) c.onMun(null, c.sel.uf);
+      else if (c.sel.uf) c.onUF(null);
+    };
+    // girar a roda do mouse para afastar além do enquadramento volta um nível (município → UF → Brasil)
+    m.on("zoomend", (e) => {
+      const c = cb.current;
+      if (!(e as { originalEvent?: Event }).originalEvent || zoomAlvo.current == null || !(c.sel.uf || c.sel.mun)) return;
+      if (m.getZoom() < zoomAlvo.current - 0.6) voltar();
+    });
 
     m.on("mousemove", "uf-fill", (e) => {
       const c = cb.current;
@@ -126,6 +139,7 @@ export default function MapaBrasil({ geo, sel, nivelMun, valoresUF, valoresMun, 
       }
       const ufF = m.queryRenderedFeatures(e.point, { layers: ["uf-fill"] });
       if (ufF.length) c.onUF(ufF[0].properties.uf as string);
+      else voltar(); // clique fora do Brasil (no fundo) volta um nível
     });
 
     mapa.current = m;
@@ -176,7 +190,7 @@ export default function MapaBrasil({ geo, sel, nivelMun, valoresUF, valoresMun, 
       type: "line",
       source: "mun",
       filter: ["==", ["get", "id"], ""],
-      paint: { "line-color": "#1c1b19", "line-width": 2.5 },
+      paint: { "line-color": "#1c1b19", "line-width": 3 },
     });
 
     m.on("mousemove", "mun-fill", (e) => {
@@ -222,7 +236,7 @@ export default function MapaBrasil({ geo, sel, nivelMun, valoresUF, valoresMun, 
       const uf = f.properties.uf;
       const dentro = !sel.uf || sel.uf === uf;
       const cor = mostrarMun ? "#ecebe6" : pintura ? pintura.uf(uf) : corDe(valorMetrica(valoresUF.get(uf), metrica), quebras);
-      m.setFeatureState({ source: "uf", id: uf }, { c: cor, o: dentro ? 1 : 0.35 });
+      m.setFeatureState({ source: "uf", id: uf }, { c: cor, o: dentro ? 1 : 0.55 });
     }
     if (m.getSource("mun") && geo.mun) {
       const vis = mostrarMun ? "visible" : "none";
@@ -248,7 +262,11 @@ export default function MapaBrasil({ geo, sel, nivelMun, valoresUF, valoresMun, 
     if (!m || !pronto) return;
     const b = sel.mun ? geo.bboxMun.get(sel.mun) : sel.uf ? geo.bboxUF.get(sel.uf) : BR;
     if (!b) return;
-    m.fitBounds(b, { padding: sel.mun ? 120 : 28, duration: 900, maxZoom: sel.mun ? 7.2 : 7.5 });
+    m.fitBounds(b, { padding: sel.mun ? 140 : sel.uf ? 56 : 16, duration: 900, maxZoom: sel.mun ? 6.4 : 7.5 });
+    zoomAlvo.current = null;
+    m.once("moveend", () => {
+      zoomAlvo.current = m.getZoom();
+    });
   }, [pronto, sel.uf, sel.mun, geo.bboxUF, geo.bboxMun]);
 
   const legenda = { quebras };
@@ -256,6 +274,26 @@ export default function MapaBrasil({ geo, sel, nivelMun, valoresUF, valoresMun, 
   return (
     <div className="relative h-full w-full overflow-hidden rounded-xl">
       <div ref={div} className="h-full w-full" aria-label="Mapa do crédito rural por estado e município" role="img" />
+
+      {/* voltar (migalhas) */}
+      {sel.uf && (
+        <div className="absolute left-3 top-3 z-10 flex flex-wrap gap-1.5">
+          <button
+            onClick={() => onUF(null)}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-stone-200 bg-white/95 px-2.5 py-1.5 text-xs font-medium text-stone-700 shadow-sm hover:bg-white hover:text-stone-900"
+          >
+            <ArrowLeft size={13} /> Brasil
+          </button>
+          {sel.mun && (
+            <button
+              onClick={() => onMun(null, sel.uf!)}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-stone-200 bg-white/95 px-2.5 py-1.5 text-xs font-medium text-stone-700 shadow-sm hover:bg-white hover:text-stone-900"
+            >
+              <ArrowLeft size={13} /> {nomesUF[sel.uf]?.nome ?? sel.uf}
+            </button>
+          )}
+        </div>
+      )}
 
       {/* controles */}
       <div className="absolute right-3 top-3 flex flex-col gap-1.5">

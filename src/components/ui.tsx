@@ -56,7 +56,7 @@ export function Vazio({ children }: { children: ReactNode }) {
 export function BarrasH({
   itens,
   fmt,
-  cor = "#2a78d6",
+  cor = "#2f8f57",
   onClick,
   ativo,
   max,
