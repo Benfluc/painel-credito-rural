@@ -180,7 +180,17 @@ export default function App() {
       area = (x?.aC ?? 0) + (x?.aI ?? 0);
     } else {
       atual = geo.uf ? vUF.get(geo.uf) ?? { q: 0, v: 0 } : total(vUF);
-      if (vMunTodos) for (const [id, x] of vMunTodos) if (!geo.uf || id.startsWith(geo.uf)) area += x.aC + x.aI;
+      // área por UF vem da tabela de produtos (completa); a municipal pode ser parcial
+      const pr = dados.prod;
+      const [iUf, iFin, iAt, iPg, iA] = ["uf", "fin", "at", "pg", "a"].map((c) => pr.h.indexOf(c));
+      for (const r of pr.r) {
+        const fin = r[iFin] as number;
+        if (fin > 1 || !f.fins[fin]) continue;
+        if (geo.uf && r[iUf] !== geo.uf) continue;
+        if (f.at && r[iAt] !== f.at) continue;
+        if (f.pg >= 0 && r[iPg] !== f.pg) continue;
+        area += r[iA] as number;
+      }
     }
     // comparação com o mesmo período (meses com dados) do ano anterior
     let prev: QV | null = null;
@@ -312,16 +322,6 @@ export default function App() {
           <span>
             <b>Modo amostra:</b> estes dados são respostas reais do BCB gravadas para teste. Estados e Brasil têm 2022–2023 completos; municípios e produtos têm só jan/2023. Rode o ETL (GitHub Actions ou{" "}
             <code>npm run etl</code>) para carregar a série completa desde 2013.
-          </span>
-        </div>
-      )}
-
-      {meta?.origem === "microdados" && !meta.amostra && (
-        <div className="mx-auto mb-3 flex max-w-[1400px] items-start gap-2 rounded-xl border border-sky-400/20 bg-sky-400/[0.06] px-4 py-2.5 text-xs text-sky-100/85">
-          <TriangleAlert size={14} className="mt-0.5 shrink-0" />
-          <span>
-            <b>Dados dos microdados do BCB.</b> Brasil e estados estão completos. No nível municipal, o BCB só publica o município das operações com recursos públicos ou Proagro
-            {cobMun ? ` — em ${f.ano}, ${pct0(cobMun.q)} dos contratos e ${pct0(cobMun.v)} do valor` : ""}. Os municípios ficam completos quando a API do SICOR voltar ao ar.
           </span>
         </div>
       )}
