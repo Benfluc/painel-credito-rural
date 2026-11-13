@@ -80,7 +80,7 @@ export default function MunicipioAoVivo({
 
   const selo =
     estado.s === "ok" ? (
-      <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/25 bg-emerald-400/10 px-2 py-0.5 text-[11px] font-medium text-emerald-200">
+      <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-600/25 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-800">
         <Radio size={12} className="animate-pulse" /> Ao vivo do BCB · {new Date(estado.d.consultadoEm).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
       </span>
     ) : null;
@@ -89,7 +89,7 @@ export default function MunicipioAoVivo({
     <Card
       titulo={
         <>
-          {nome} <span className="font-normal text-white/45">· {uf} · {filtros.ano}</span>
+          {nome} <span className="font-normal text-stone-500">· {uf} · {filtros.ano}</span>
         </>
       }
       sub="Consulta direta à API do SICOR para o município selecionado"
@@ -100,21 +100,21 @@ export default function MunicipioAoVivo({
       {estado.s === "carregando" && (
         <div className="grid gap-4 lg:grid-cols-3">
           <div className="lg:col-span-2">
-            <p className="mb-2 text-xs text-white/50">Consultando o Banco Central… a API do SICOR costuma levar de 5 a 30 segundos.</p>
+            <p className="mb-2 text-xs text-stone-500">Consultando o Banco Central… a API do SICOR costuma levar de 5 a 30 segundos.</p>
             <Skeleton className="h-56" />
           </div>
           <Skeleton className="h-64" />
         </div>
       )}
       {estado.s === "erro" && (
-        <div className="flex flex-col items-center gap-3 py-8 text-center text-sm text-white/60">
-          <AlertTriangle className="text-amber-300" />
+        <div className="flex flex-col items-center gap-3 py-8 text-center text-sm text-stone-600">
+          <AlertTriangle className="text-amber-600" />
           <p>
             A API do Banco Central não respondeu agora. Ela tem instabilidades conhecidas.
             <br />
-            <span className="text-xs text-white/40">{estado.msg}</span>
+            <span className="text-xs text-stone-500">{estado.msg}</span>
           </p>
-          <button onClick={() => setTentativa((t) => t + 1)} className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 px-3 py-1.5 text-xs text-white/80 hover:bg-white/5">
+          <button onClick={() => setTentativa((t) => t + 1)} className="inline-flex items-center gap-1.5 rounded-lg border border-stone-200 px-3 py-1.5 text-xs text-stone-700 hover:bg-stone-100">
             <RefreshCw size={13} /> Tentar de novo
           </button>
         </div>
@@ -123,31 +123,31 @@ export default function MunicipioAoVivo({
         <div className="grid gap-5 lg:grid-cols-3">
           <div className="lg:col-span-2">
             <div className="mb-2 flex items-center justify-between">
-              <h3 className="text-xs font-medium uppercase tracking-wide text-white/50">Contratações por mês</h3>
+              <h3 className="text-xs font-medium uppercase tracking-wide text-stone-500">Contratações por mês</h3>
               <LegendaFin fins={filtros.fins} />
             </div>
             {estado.d.mensal.length ? <BarrasEmpilhadas serie={visao.mensal} fins={filtros.fins} metrica={filtros.metrica} altura={230} /> : <Vazio>Nenhum contrato registrado em {filtros.ano}.</Vazio>}
             {estado.d.avisos.map((a) => (
-              <p key={a} className="mt-2 text-[11px] text-amber-200/70">{a}</p>
+              <p key={a} className="mt-2 text-[11px] text-amber-700">{a}</p>
             ))}
           </div>
           <div className="space-y-4">
             {filtros.fins[0] && (
               <div>
-                <h3 className="mb-1.5 text-xs font-medium uppercase tracking-wide text-white/50">Custeio · principais produtos</h3>
+                <h3 className="mb-1.5 text-xs font-medium uppercase tracking-wide text-stone-500">Custeio · principais produtos</h3>
                 <BarrasH itens={visao.custeio} fmt={(v) => brl(v)} cor={COR_FIN[0]} />
               </div>
             )}
             {filtros.fins[1] && (
               <div>
-                <h3 className="mb-1.5 text-xs font-medium uppercase tracking-wide text-white/50">Investimento · principais itens</h3>
+                <h3 className="mb-1.5 text-xs font-medium uppercase tracking-wide text-stone-500">Investimento · principais itens</h3>
                 <BarrasH itens={visao.invest} fmt={(v) => brl(v)} cor={COR_FIN[1]} />
               </div>
             )}
             {pam && pam.culturas.length > 0 && (
               <div>
-                <h3 className="mb-1.5 text-xs font-medium uppercase tracking-wide text-white/50">Produção agrícola · PAM {pam.ano}</h3>
-                <BarrasH itens={pam.culturas.map((c) => ({ ...c, extra: c.a > 0 ? ha(c.a) : undefined }))} fmt={(v) => brl(v)} cor="#45b675" />
+                <h3 className="mb-1.5 text-xs font-medium uppercase tracking-wide text-stone-500">Produção agrícola · PAM {pam.ano}</h3>
+                <BarrasH itens={pam.culturas.map((c) => ({ ...c, extra: c.a > 0 ? ha(c.a) : undefined }))} fmt={(v) => brl(v)} cor="#2a78d6" />
               </div>
             )}
           </div>

@@ -14,7 +14,7 @@ const pctS = (x: number) => `${new Intl.NumberFormat("pt-BR", { maximumFractionD
 export function LegendaQL({ ref_ }: { ref_: string }) {
   return (
     <div>
-      <div className="mb-1.5 font-medium text-white/85">Quociente de localização · ref. {ref_}</div>
+      <div className="mb-1.5 font-medium text-stone-800">Quociente de localização · ref. {ref_}</div>
       <div className="flex items-center gap-[2px]">
         <span className="mr-1 h-2.5 w-4 rounded-sm" style={{ background: COR_ZERO }} title="Sem crédito e sem produção" />
         {CLASSES_QL.map((c) => (
@@ -43,15 +43,15 @@ function DicaPonto({ active, payload }: TooltipProps<number, string>) {
   if (!active || !payload?.length) return null;
   const p = payload[0].payload as Ponto;
   return (
-    <div className="rounded-lg border border-white/10 bg-[#0b100e]/95 px-3 py-2 text-xs shadow-xl">
-      <div className="font-semibold text-white">{p.nome}</div>
-      <div className="mt-1 grid grid-cols-[auto_auto] gap-x-4 tabular-nums text-white/70">
+    <div className="rounded-lg border border-stone-200 bg-white/95 px-3 py-2 text-xs shadow-xl">
+      <div className="font-semibold text-stone-900">{p.nome}</div>
+      <div className="mt-1 grid grid-cols-[auto_auto] gap-x-4 tabular-nums text-stone-700">
         <span>Produção (PAM)</span>
-        <span className="text-right text-white">{brl(p.par.p)}</span>
+        <span className="text-right text-stone-900">{brl(p.par.p)}</span>
         <span>Crédito agrícola</span>
-        <span className="text-right text-white">{brl(p.par.c)}</span>
+        <span className="text-right text-stone-900">{brl(p.par.c)}</span>
         <span>QL</span>
-        <span className="text-right font-semibold text-emerald-300">{fmtQL(p.ql)}</span>
+        <span className="text-right font-semibold text-emerald-700">{fmtQL(p.ql)}</span>
       </div>
     </div>
   );
@@ -143,7 +143,7 @@ export default function CreditoProducao({ meta, pamMeta, pam, anoPam, defasagem,
       }
     >
       {avisoMun && (
-        <div className="mb-4 rounded-lg border border-amber-400/20 bg-amber-400/[0.07] px-3 py-2 text-xs text-amber-100/85">
+        <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
           <b>Atenção:</b> {avisoMun} Como o crédito com recursos livres e LCA não equalizada fica de fora, o QL municipal subestima o crédito em regiões de agricultura empresarial. Os indicadores
           por cultura e por estado usam a base completa.
         </div>
@@ -158,10 +158,10 @@ export default function CreditoProducao({ meta, pamMeta, pam, anoPam, defasagem,
             ? { r: `QL de ${nomeMun.get(geo.mun!) ?? geo.mun}`, v: fmtQL(sel.ql), d: `${brl(sel.c)} de crédito · ${brl(sel.p)} produzidos` }
             : { r: "Municípios fora do equilíbrio", v: `${ind.acima.toLocaleString("pt-BR")} ↑ · ${ind.abaixo.toLocaleString("pt-BR")} ↓`, d: "QL ≥ 2 (↑) e QL < 0,5 (↓)" },
         ].map((k) => (
-          <div key={k.r} className="rounded-xl border border-white/[0.07] bg-white/[0.02] p-3">
-            <div className="text-[11px] font-medium uppercase tracking-wide text-white/45">{k.r}</div>
-            <div className="mt-1 text-xl font-semibold tabular-nums text-white">{k.v}</div>
-            <div className="mt-0.5 text-[11px] text-white/40">{k.d}</div>
+          <div key={k.r} className="rounded-xl border border-stone-200 bg-stone-100 p-3">
+            <div className="text-[11px] font-medium uppercase tracking-wide text-stone-500">{k.r}</div>
+            <div className="mt-1 text-xl font-semibold tabular-nums text-stone-900">{k.v}</div>
+            <div className="mt-0.5 text-[11px] text-stone-500">{k.d}</div>
           </div>
         ))}
       </div>
@@ -169,22 +169,22 @@ export default function CreditoProducao({ meta, pamMeta, pam, anoPam, defasagem,
       <div className="grid gap-6 lg:grid-cols-5">
         {/* dispersão */}
         <div className="lg:col-span-3">
-          <h3 className="mb-1 text-xs font-medium uppercase tracking-wide text-white/50">Cada ponto é um município · eixo y: crédito agrícola · escala log</h3>
-          <p className="mb-2 text-[11px] text-white/40">
+          <h3 className="mb-1 text-xs font-medium uppercase tracking-wide text-stone-500">Cada ponto é um município · eixo y: crédito agrícola · escala log</h3>
+          <p className="mb-2 text-[11px] text-stone-500">
             A linha marca a proporção de {nomeEscopo} (QL = 1). Acima dela, o município recebe mais crédito do que sua fatia na produção. Fora do gráfico: {ind.nSemCred.toLocaleString("pt-BR")} municípios com produção e sem crédito.
           </p>
           {ind.pontos.length ? (
             <div className="h-[340px]">
               <ResponsiveContainer width="100%" height="100%">
                 <ScatterChart margin={{ top: 8, right: 12, bottom: 18, left: 4 }}>
-                  <CartesianGrid stroke="#2c2c2a" />
-                  <XAxis type="number" dataKey="x" scale="log" domain={["auto", "auto"]} tickFormatter={eixo} tick={{ fill: "#898781", fontSize: 11 }} axisLine={{ stroke: "#383835" }} tickLine={false} name="Produção" label={{ value: "Valor da produção (R$)", position: "insideBottom", offset: -10, fill: "#898781", fontSize: 11 }} />
-                  <YAxis type="number" dataKey="y" scale="log" domain={["auto", "auto"]} tickFormatter={eixo} tick={{ fill: "#898781", fontSize: 11 }} axisLine={false} tickLine={false} width={52} name="Crédito" />
+                  <CartesianGrid stroke="#e7e6e1" />
+                  <XAxis type="number" dataKey="x" scale="log" domain={["auto", "auto"]} tickFormatter={eixo} tick={{ fill: "#6b6a64", fontSize: 11 }} axisLine={{ stroke: "#d4d3cc" }} tickLine={false} name="Produção" label={{ value: "Valor da produção (R$)", position: "insideBottom", offset: -10, fill: "#6b6a64", fontSize: 11 }} />
+                  <YAxis type="number" dataKey="y" scale="log" domain={["auto", "auto"]} tickFormatter={eixo} tick={{ fill: "#6b6a64", fontSize: 11 }} axisLine={false} tickLine={false} width={52} name="Crédito" />
                   <Tooltip content={<DicaPonto />} cursor={{ stroke: "#555", strokeDasharray: "3 3" }} />
-                  <ReferenceLine segment={[{ x: xMin, y: xMin * ind.razao }, { x: xMax, y: xMax * ind.razao }]} stroke="#c3c2b7" strokeDasharray="5 4" ifOverflow="hidden" />
+                  <ReferenceLine segment={[{ x: xMin, y: xMin * ind.razao }, { x: xMax, y: xMax * ind.razao }]} stroke="#52514e" strokeDasharray="5 4" ifOverflow="hidden" />
                   <Scatter data={ind.pontos} isAnimationActive={false} onClick={(p) => onMun((p as unknown as Ponto).id)}>
                     {ind.pontos.map((p) => (
-                      <Cell key={p.id} fill={corQL(p.par, COR_ZERO)} fillOpacity={geo.mun && p.id !== geo.mun ? 0.35 : 0.85} stroke={p.id === geo.mun ? "#fff" : "none"} strokeWidth={2} r={p.id === geo.mun ? 7 : 3} cursor="pointer" />
+                      <Cell key={p.id} fill={corQL(p.par, COR_ZERO)} fillOpacity={geo.mun && p.id !== geo.mun ? 0.35 : 0.85} stroke={p.id === geo.mun ? "#1c1b19" : "none"} strokeWidth={2} r={p.id === geo.mun ? 7 : 3} cursor="pointer" />
                     ))}
                   </Scatter>
                 </ScatterChart>
@@ -197,13 +197,13 @@ export default function CreditoProducao({ meta, pamMeta, pam, anoPam, defasagem,
 
         {/* culturas */}
         <div className="lg:col-span-2">
-          <h3 className="mb-1 text-xs font-medium uppercase tracking-wide text-white/50">Fatia de cada cultura · {nomeEscopo}</h3>
-          <div className="mb-3 flex gap-4 text-[11px] text-white/60">
+          <h3 className="mb-1 text-xs font-medium uppercase tracking-wide text-stone-500">Fatia de cada cultura · {nomeEscopo}</h3>
+          <div className="mb-3 flex gap-4 text-[11px] text-stone-600">
             <span className="flex items-center gap-1.5">
-              <i className="h-2 w-2 rounded-sm bg-[#45b675]" /> no valor da produção
+              <i className="h-2 w-2 rounded-sm bg-[#2a78d6]" /> no valor da produção
             </span>
             <span className="flex items-center gap-1.5">
-              <i className="h-2 w-2 rounded-sm bg-[#3987e5]" /> no custeio agrícola
+              <i className="h-2 w-2 rounded-sm bg-[#2a78d6]" /> no custeio agrícola
             </span>
           </div>
           {culturas.length ? (
@@ -211,17 +211,17 @@ export default function CreditoProducao({ meta, pamMeta, pam, anoPam, defasagem,
               {culturas.map((c) => (
                 <li key={c.nome} className="text-[13px]">
                   <div className="mb-1 flex justify-between">
-                    <span className="text-white/85">{c.nome}</span>
-                    <span className="tabular-nums text-[12px] text-white/55">
-                      {pctS(c.shareP)} · <span className="text-white/80">{pctS(c.shareC)}</span>
+                    <span className="text-stone-800">{c.nome}</span>
+                    <span className="tabular-nums text-[12px] text-stone-600">
+                      {pctS(c.shareP)} · <span className="text-stone-700">{pctS(c.shareC)}</span>
                     </span>
                   </div>
                   <div className="space-y-[2px]">
-                    <div className="h-1.5 rounded-full bg-white/[0.04]">
-                      <div className="h-full rounded-full bg-[#45b675]" style={{ width: `${(c.shareP / maxShare) * 100}%` }} />
+                    <div className="h-1.5 rounded-full bg-stone-100">
+                      <div className="h-full rounded-full bg-[#2a78d6]" style={{ width: `${(c.shareP / maxShare) * 100}%` }} />
                     </div>
-                    <div className="h-1.5 rounded-full bg-white/[0.04]">
-                      <div className="h-full rounded-full bg-[#3987e5]" style={{ width: `${(c.shareC / maxShare) * 100}%` }} />
+                    <div className="h-1.5 rounded-full bg-stone-100">
+                      <div className="h-full rounded-full bg-[#2a78d6]" style={{ width: `${(c.shareC / maxShare) * 100}%` }} />
                     </div>
                   </div>
                 </li>

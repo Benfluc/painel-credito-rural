@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { Database, Radio, Sprout, TriangleAlert, ExternalLink } from "lucide-react";
 import {
@@ -26,6 +26,9 @@ import { brl, dataHora, fmtMetrica, ha, mesAno, MESES, NOME_METRICA, num, pct } 
 import { COR_FIN } from "./lib/colors";
 import MapaBrasil, { type Pintura } from "./components/MapaBrasil";
 import CreditoProducao, { fmtQL, LegendaQL } from "./components/CreditoProducao";
+import Inadimplencia from "./components/Inadimplencia";
+import FichaMunicipio from "./components/FichaMunicipio";
+import { BarChart3, Map as MapaIcone, ListOrdered, LayoutDashboard, ShieldAlert, SlidersHorizontal, X as Fechar } from "lucide-react";
 import { anoPam as escolherAnoPam, carregarPam, carregarPamMeta, corQL, creditoAgricolaMun, culturasMun, pares, paresUF, producaoMun, type PamAno, type PamMeta } from "./lib/pam";
 import { COR_ZERO } from "./lib/colors";
 import MunicipioAoVivo from "./components/MunicipioAoVivo";
@@ -34,6 +37,7 @@ import { BarrasEmpilhadas, FIN_NOMES, LegendaFin, serieMensal } from "./componen
 import { BarrasH, Card, Segmentado, Skeleton, Vazio } from "./components/ui";
 
 // ---------------------------------------------------------------- URL <-> estado
+type Aba = "credito" | "risco";
 function lerURL(): { f: Partial<Filtros>; geo: Geo } {
   const p = new URLSearchParams(location.search);
   const fins = p.get("fin");
@@ -48,7 +52,7 @@ function lerURL(): { f: Partial<Filtros>; geo: Geo } {
     geo: { uf: p.get("uf"), mun: p.get("mun") },
   };
 }
-function gravarURL(f: Filtros, geo: Geo) {
+function gravarURL(f: Filtros, geo: Geo, aba: Aba) {
   const p = new URLSearchParams();
   p.set("ano", String(f.ano));
   if (!f.fins.every(Boolean)) p.set("fin", f.fins.map((b) => (b ? 1 : 0)).join(""));
@@ -57,12 +61,26 @@ function gravarURL(f: Filtros, geo: Geo) {
   if (f.metrica !== "valor") p.set("m", f.metrica);
   if (geo.uf) p.set("uf", geo.uf);
   if (geo.mun) p.set("mun", geo.mun);
+  if (aba !== "credito") p.set("aba", aba);
   history.replaceState(null, "", `?${p}`);
 }
 
 function partic(x: number) {
   return `${new Intl.NumberFormat("pt-BR", { maximumFractionDigits: x < 0.01 ? 3 : 1, minimumFractionDigits: x < 0.01 ? 2 : 1 }).format(x * 100)}%`;
 }
+
+function useMobile() {
+  const q = "(max-width: 767px)";
+  const [m, setM] = useState(() => typeof window !== "undefined" && window.matchMedia(q).matches);
+  useEffect(() => {
+    const mq = window.matchMedia(q);
+    const f = () => setM(mq.matches);
+    mq.addEventListener("change", f);
+    return () => mq.removeEventListener("change", f);
+  }, []);
+  return m;
+}
+type SubAba = "resumo" | "mapa" | "ranking" | "analises";
 
 // ---------------------------------------------------------------- componentes locais
 function Github({ size = 14 }: { size?: number }) {
@@ -76,15 +94,15 @@ function Github({ size = 14 }: { size?: number }) {
 function Kpi({ rotulo, valor, detalhe, delta, i }: { rotulo: string; valor: string; detalhe?: string; delta?: number | null; i: number }) {
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }} className="card p-4">
-      <div className="text-[11px] font-medium uppercase tracking-wide text-white/45">{rotulo}</div>
-      <div className="mt-1.5 text-2xl font-semibold tracking-tight text-white">{valor}</div>
+      <div className="text-[11px] font-medium uppercase tracking-wide text-stone-500">{rotulo}</div>
+      <div className="mt-1.5 text-2xl font-semibold tracking-tight text-stone-900">{valor}</div>
       <div className="mt-1 flex items-center gap-2 text-xs">
         {delta != null && Number.isFinite(delta) && (
-          <span className={`font-medium tabular-nums ${delta >= 0 ? "text-emerald-300" : "text-rose-300"}`}>
+          <span className={`font-medium tabular-nums ${delta >= 0 ? "text-emerald-700" : "text-rose-600"}`}>
             {delta >= 0 ? "▲" : "▼"} {pct(delta)}
           </span>
         )}
-        {detalhe && <span className="text-white/40">{detalhe}</span>}
+        {detalhe && <span className="text-stone-500">{detalhe}</span>}
       </div>
     </motion.div>
   );
@@ -101,12 +119,13 @@ function StatusFonte({ meta }: { meta: Meta }) {
   const novo = s?.ultimoMes && meta.ultimoMes && s.ultimoMes > meta.ultimoMes;
   return (
     <div className="flex flex-wrap items-center gap-2 text-xs">
-      <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-white/70">
-        <Database size={12} /> Dados até <b className="font-semibold text-white">{mesAno(meta.ultimoMes)}</b> · sincronizado em {dataHora(meta.geradoEm)}
+      <span className="inline-flex items-center gap-1.5 rounded-full border border-stone-200 bg-stone-100 px-2.5 py-1 text-stone-700">
+        <Database size={12} /> Dados até <b className="font-semibold text-stone-900">{mesAno(meta.ultimoMes)}</b>
+        <span className="hidden sm:inline">· sincronizado em {dataHora(meta.geradoEm)}</span>
       </span>
       {s && (
         <span
-          className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 ${s.online ? "border-emerald-400/25 bg-emerald-400/10 text-emerald-200" : "border-amber-400/25 bg-amber-400/10 text-amber-200"}`}
+          className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 ${s.online ? "border-emerald-600/25 bg-emerald-50 text-emerald-800" : "border-amber-300 bg-amber-50 text-amber-800"}`}
           title="Verificação ao vivo da API do Banco Central"
         >
           <Radio size={12} className={s.online ? "animate-pulse" : ""} />
@@ -126,6 +145,19 @@ export default function App() {
   const [f, setF] = useState<Filtros>({ ano: 0, fins: [true, true, true, true], at: 0, pg: -1, metrica: "valor", ...inicial.f });
   const [geo, setGeo] = useState<Geo>(inicial.geo);
   const [nivelMun, setNivelMun] = useState(false);
+  const [aba, setAba] = useState<Aba>(() => (new URLSearchParams(location.search).get("aba") === "risco" ? "risco" : "credito"));
+  const mobile = useMobile();
+  const [subAba, setSubAba] = useState<SubAba>("resumo");
+  const [filtrosAbertos, setFiltrosAbertos] = useState(false);
+  const rolarParaFicha = useRef(false);
+  const vis = (s_: SubAba) => !mobile || subAba === s_;
+  const selecionarMun = (id: string) => {
+    setGeo({ uf: id.slice(0, 2), mun: id });
+    if (mobile) {
+      setSubAba("resumo");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } else rolarParaFicha.current = true;
+  };
   const [dados, setDados] = useState<DadosAno | null>(null);
   const [anterior, setAnterior] = useState<Tabela | null>(null);
   const base = useGeo();
@@ -162,8 +194,8 @@ export default function App() {
   }, [meta, f.ano]);
 
   useEffect(() => {
-    if (f.ano) gravarURL(f, geo);
-  }, [f, geo]);
+    if (f.ano) gravarURL(f, geo, aba);
+  }, [f, geo, aba]);
 
   // ---------- agregações ----------
   const vUF = useMemo(() => (dados ? porUF(dados.uf, f) : new Map<string, QV>()), [dados, f]);
@@ -266,6 +298,37 @@ export default function App() {
     : undefined;
   const mostrandoMun = !!(geo.uf || nivelMun || geo.mun);
 
+  // ---------- ficha do município ----------
+  const ficha = useMemo(() => {
+    if (!geo.mun || !dados || !meta || !vMunTodos) return null;
+    const id = geo.mun;
+    const uf = id.slice(0, 2);
+    const val = (x: QV) => valorMetrica(x, f.metrica);
+    const lista = [...vMunTodos].filter(([, x]) => f.metrica !== "medio" || x.q >= 5).sort((a, b) => val(b[1]) - val(a[1]));
+    const iBR = lista.findIndex(([k]) => k === id);
+    const lUF = lista.filter(([k]) => k.startsWith(uf));
+    const iUF = lUF.findIndex(([k]) => k === id);
+    const ag = porMun(dados.mun, { ...f, at: 1 }, uf).get(id);
+    const pe = porMun(dados.mun, { ...f, at: 2 }, uf).get(id);
+    return {
+      x: vMunTodos.get(id),
+      ufTot: vUF.get(uf),
+      posUF: iUF >= 0 ? { pos: iUF + 1, n: lUF.length } : null,
+      posBR: iBR >= 0 ? { pos: iBR + 1, n: lista.length } : null,
+      atividades: [
+        { k: "1", nome: "Agrícola", v: ag ? val(ag) : 0 },
+        { k: "2", nome: "Pecuária", v: pe ? val(pe) : 0 },
+      ],
+    };
+  }, [geo.mun, dados, meta, vMunTodos, vUF, f]);
+
+  useEffect(() => {
+    if (rolarParaFicha.current && geo.mun) {
+      rolarParaFicha.current = false;
+      setTimeout(() => document.getElementById("ficha-municipio")?.scrollIntoView({ behavior: "smooth", block: "start" }), 120);
+    }
+  }, [geo.mun]);
+
   const contextoUF = geo.uf; // gráficos de BR/UF usam a UF mesmo com município selecionado
   const serieM = useMemo(() => (dados ? serieMensal(mensal(dados.uf, f, contextoUF), meses) : []), [dados, f, contextoUF, meses]);
   const hist = useMemo(() => (serieAnual ? historico(serieAnual, f, contextoUF).map((h) => ({ rotulo: String(h.ano), fins: h.fins })) : []), [serieAnual, f, contextoUF]);
@@ -287,37 +350,38 @@ export default function App() {
   const nomeContexto = contextoUF ? meta?.ufs[contextoUF]?.nome : "Brasil";
   const fmt = (v: number) => fmtMetrica(v, f.metrica);
   const periodo = meses && meses.length < 12 ? `${MESES[0]}–${MESES[Math.max(...meses) - 1]}/${f.ano}` : String(f.ano);
+  const periodoAnterior = meses && meses.length < 12 ? `${MESES[0]}–${MESES[Math.max(...meses) - 1]}/${f.ano - 1}` : String(f.ano - 1);
 
   if (erro)
     return (
-      <div className="grid min-h-screen place-items-center p-6 text-center text-white/70">
+      <div className="grid min-h-screen place-items-center p-6 text-center text-stone-700">
         <div>
-          <TriangleAlert className="mx-auto mb-3 text-amber-300" />
+          <TriangleAlert className="mx-auto mb-3 text-amber-600" />
           <p>Não foi possível carregar os dados.</p>
-          <p className="mt-1 text-xs text-white/40">{erro}</p>
-          <p className="mt-3 text-xs text-white/40">Rode o ETL (<code>npm run etl</code>) para gerar a pasta <code>public/data</code>.</p>
+          <p className="mt-1 text-xs text-stone-500">{erro}</p>
+          <p className="mt-3 text-xs text-stone-500">Rode o ETL (<code>npm run etl</code>) para gerar a pasta <code>public/data</code>.</p>
         </div>
       </div>
     );
 
   return (
-    <div className="min-h-screen px-4 pb-10 sm:px-6">
+    <div className={`min-h-screen px-4 sm:px-6 ${mobile ? "pb-36" : "pb-10"}`}>
       {/* topo */}
-      <header className="mx-auto flex max-w-[1400px] flex-col gap-4 py-6 md:flex-row md:items-end md:justify-between">
+      <header className="mx-auto flex max-w-[1400px] flex-col gap-3 py-4 md:flex-row md:items-end md:justify-between md:gap-4 md:py-6">
         <div className="flex items-center gap-3">
-          <div className="grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-emerald-400/25 to-lime-300/10 ring-1 ring-emerald-300/25">
-            <Sprout className="text-emerald-300" size={22} />
+          <div className="grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-emerald-100 to-lime-50 ring-1 ring-emerald-600/20">
+            <Sprout className="text-emerald-700" size={22} />
           </div>
           <div>
-            <h1 className="text-xl font-semibold tracking-tight text-white sm:text-2xl">Painel do Crédito Rural</h1>
-            <p className="text-sm text-white/50">Contratações de crédito rural no Brasil por estado e município · SICOR / Banco Central</p>
+            <h1 className="text-xl font-semibold tracking-tight text-stone-900 sm:text-2xl">Painel do Crédito Rural</h1>
+            <p className="hidden text-sm text-stone-500 sm:block">Contratações de crédito rural no Brasil por estado e município · SICOR / Banco Central</p>
           </div>
         </div>
         {meta && <StatusFonte meta={meta} />}
       </header>
 
       {meta?.amostra && (
-        <div className="mx-auto mb-3 flex max-w-[1400px] items-start gap-2 rounded-xl border border-amber-400/20 bg-amber-400/[0.07] px-4 py-2.5 text-xs text-amber-100/85">
+        <div className="mx-auto mb-3 flex max-w-[1400px] items-start gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-2.5 text-xs text-amber-900">
           <TriangleAlert size={14} className="mt-0.5 shrink-0" />
           <span>
             <b>Modo amostra:</b> estes dados são respostas reais do BCB gravadas para teste. Estados e Brasil têm 2022–2023 completos; municípios e produtos têm só jan/2023. Rode o ETL (GitHub Actions ou{" "}
@@ -326,15 +390,57 @@ export default function App() {
         </div>
       )}
 
-      {meta && <BarraFiltros meta={meta} f={f} setF={setF} geo={geo} setGeo={setGeo} nomeMun={base?.nomeMun ?? new Map()} />}
+      {/* abas */}
+      <nav aria-label="Seções do painel" className="mx-auto mb-4 hidden max-w-[1400px] gap-1 border-b border-stone-200 md:flex">
+        {(
+          [
+            ["credito", "Contratações"],
+            ["risco", "Risco e inadimplência"],
+          ] as [Aba, string][]
+        ).map(([k, t]) => (
+          <button
+            key={k}
+            onClick={() => setAba(k)}
+            aria-current={aba === k ? "page" : undefined}
+            className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium transition ${aba === k ? "border-emerald-600 text-stone-900" : "border-transparent text-stone-500 hover:text-stone-700"}`}
+          >
+            {t}
+          </button>
+        ))}
+      </nav>
 
-      <main className="mx-auto mt-5 max-w-[1400px] space-y-5">
+      {aba === "risco" && meta && (
+        <main className="mx-auto max-w-[1400px]">
+          <Inadimplencia meta={meta} base={base} uf={geo.uf} setUf={(uf) => setGeo({ uf, mun: null })} mobile={mobile} />
+        </main>
+      )}
+
+      {aba === "credito" && meta && !mobile && <BarraFiltros meta={meta} f={f} setF={setF} geo={geo} setGeo={setGeo} nomeMun={base?.nomeMun ?? new Map()} />}
+
+      {/* celular: contexto do recorte */}
+      {aba === "credito" && meta && mobile && (
+        <button
+          onClick={() => setFiltrosAbertos(true)}
+          className="sticky top-0 z-20 -mx-4 mb-3 flex w-[calc(100%+2rem)] items-center gap-2 border-b border-stone-200 bg-[#f7f7f4]/95 px-4 py-2.5 text-left text-sm backdrop-blur"
+        >
+          <SlidersHorizontal size={15} className="shrink-0 text-emerald-700" />
+          <span className="truncate text-stone-700">
+            <b className="text-stone-900">{f.ano}</b> · {nomeGeo} · {f.at === 1 ? "Agrícola" : f.at === 2 ? "Pecuária" : "Todas as atividades"}
+            {f.pg >= 0 ? ` · ${meta.programas[f.pg]}` : ""}
+          </span>
+          <span className="ml-auto shrink-0 text-xs font-medium text-emerald-700">Filtros</span>
+        </button>
+      )}
+
+      {aba === "credito" && (
+      <main className="mx-auto max-w-[1400px] space-y-5 md:mt-5">
         {/* KPIs */}
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+        {vis("resumo") && !(mobile && geo.mun) && (
+        <div className={mobile ? "rolagem-x -mx-4 flex gap-3 px-4 pb-1 [&>*]:min-w-[72%]" : "grid grid-cols-2 gap-3 lg:grid-cols-5"}>
           {kpi ? (
             <>
-              <Kpi i={0} rotulo={`Valor contratado · ${periodo}`} valor={brl(kpi.atual.v)} delta={kpi.prev && kpi.prev.v ? kpi.atual.v / kpi.prev.v - 1 : null} detalhe={kpi.prev ? "vs. ano anterior" : geo.mun && munParcial ? "só crédito público/Proagro" : nomeGeo} />
-              <Kpi i={1} rotulo="Contratos" valor={num(kpi.atual.q)} delta={kpi.prev && kpi.prev.q ? kpi.atual.q / kpi.prev.q - 1 : null} detalhe={kpi.prev ? "vs. ano anterior" : undefined} />
+              <Kpi i={0} rotulo={`Valor contratado · ${periodo}`} valor={brl(kpi.atual.v)} delta={kpi.prev && kpi.prev.v ? kpi.atual.v / kpi.prev.v - 1 : null} detalhe={kpi.prev ? `vs. ${periodoAnterior}` : geo.mun && munParcial ? "só crédito público/Proagro" : nomeGeo} />
+              <Kpi i={1} rotulo="Contratos" valor={num(kpi.atual.q)} delta={kpi.prev && kpi.prev.q ? kpi.atual.q / kpi.prev.q - 1 : null} detalhe={kpi.prev ? `vs. ${periodoAnterior}` : undefined} />
               <Kpi i={2} rotulo="Valor médio por contrato" valor={kpi.atual.q ? brl(kpi.atual.v / kpi.atual.q) : "—"} />
               <Kpi i={3} rotulo="Área financiada" valor={kpi.area ? ha(kpi.area) : "—"} detalhe={f.fins[0] || f.fins[1] ? "custeio + investimento" : "só custeio e investimento"} />
               <Kpi i={4} rotulo="Participação no Brasil" valor={geo.uf || geo.mun ? partic(kpi.br.v ? kpi.atual.v / kpi.br.v : 0) : "100%"} detalhe="do valor contratado" />
@@ -343,9 +449,17 @@ export default function App() {
             Array.from({ length: 5 }, (_, i) => <Skeleton key={i} className="h-[104px]" />)
           )}
         </div>
+        )}
+
+        {mobile && vis("resumo") && !geo.mun && (
+          <div className="card p-4 text-sm text-stone-600">
+            Toque em <b>Mapa</b> ou <b>Ranking</b> para escolher um estado ou município, ou use a busca em <b>Filtros</b>. A ficha do município aparece aqui.
+          </div>
+        )}
 
         {/* mapa + ranking */}
         <div className="grid gap-5 lg:grid-cols-3">
+          {vis("mapa") && (
           <Card
             className="lg:col-span-2"
             titulo={modoMapa === "ql" ? `Crédito agrícola × produção · ${nomeGeo}` : `${NOME_METRICA[f.metrica]} · ${nomeGeo}`}
@@ -378,7 +492,7 @@ export default function App() {
               </div>
             }
           >
-            <div className="h-[460px] sm:h-[540px]">
+            <div className={mobile ? "h-[62vh]" : "h-[460px] sm:h-[540px]"}>
               {base && dados ? (
                 <MapaBrasil
                   geo={base}
@@ -389,7 +503,7 @@ export default function App() {
                   metrica={f.metrica}
                   nomesUF={meta!.ufs}
                   onUF={(uf) => setGeo({ uf, mun: null })}
-                  onMun={(mun, uf) => setGeo({ uf, mun })}
+                  onMun={(mun, uf) => (mun && mobile ? selecionarMun(mun) : setGeo({ uf, mun }))}
                   pintura={pintura}
                 />
               ) : (
@@ -397,6 +511,8 @@ export default function App() {
               )}
             </div>
           </Card>
+          )}
+          {vis("ranking") && (
           <Card
             titulo={!geo.uf && !nivelMun ? "Ranking dos estados" : `Ranking dos municípios${geo.uf ? ` · ${meta?.ufs[geo.uf]?.sigla}` : ""}`}
             sub={`${NOME_METRICA[f.metrica]} · ${periodo}${f.metrica === "medio" && (geo.uf || nivelMun) ? " · mín. 5 contratos" : ""}`}
@@ -409,26 +525,42 @@ export default function App() {
                 itens={top}
                 fmt={fmt}
                 ativo={geo.mun ?? geo.uf}
-                onClick={(k) => (k.length === 2 ? setGeo({ uf: k, mun: null }) : setGeo({ uf: k.slice(0, 2), mun: k }))}
+                onClick={(k) => (k.length === 2 ? setGeo({ uf: k, mun: null }) : selecionarMun(k))}
               />
             ) : (
               <Skeleton className="h-96" />
             )}
           </Card>
+          )}
         </div>
 
-        {/* município ao vivo */}
-        {geo.mun && dados && (
-          <MunicipioAoVivo
-            key={geo.mun}
-            ibge={geo.mun}
-            nome={nomeGeo ?? ""}
-            uf={meta!.ufs[geo.mun.slice(0, 2)]?.sigla ?? ""}
-            filtros={f}
-            pam={pam && anoP.ano ? { ano: anoP.ano, culturas: culturasMun(pam, geo.mun) } : null}
-          />
+        {/* ficha do município */}
+        {vis("resumo") && geo.mun && dados && ficha && (
+          <div id="ficha-municipio" className="scroll-mt-28 space-y-5">
+            <FichaMunicipio
+              nome={nomeGeo ?? ""}
+              ufSigla={meta!.ufs[geo.mun.slice(0, 2)]?.sigla ?? ""}
+              ufNome={meta!.ufs[geo.mun.slice(0, 2)]?.nome ?? ""}
+              ano={f.ano}
+              periodo={periodo}
+              metrica={f.metrica}
+              x={ficha.x}
+              ufTot={ficha.ufTot}
+              posUF={ficha.posUF}
+              posBR={ficha.posBR}
+              programas={programas}
+              atividades={ficha.atividades}
+              ql={cp?.escopo.pares.get(geo.mun)}
+              pam={pam && anoP.ano ? { ano: anoP.ano, culturas: culturasMun(pam, geo.mun) } : null}
+              aviso={avisoMun}
+              onFechar={() => setGeo({ uf: geo.uf, mun: null })}
+            />
+            <MunicipioAoVivo key={geo.mun} ibge={geo.mun} nome={nomeGeo ?? ""} uf={meta!.ufs[geo.mun.slice(0, 2)]?.sigla ?? ""} filtros={f} pam={null} />
+          </div>
         )}
 
+        {vis("analises") && (
+        <>
         {/* séries */}
         <div className="grid gap-5 lg:grid-cols-2">
           <Card titulo={`Evolução mensal · ${nomeContexto}`} sub={`${NOME_METRICA[f.metrica]} por mês de emissão · ${f.ano}`} acao={<LegendaFin fins={f.fins} />}>
@@ -458,7 +590,7 @@ export default function App() {
             f={f}
             geo={geo}
             nomeMun={base?.nomeMun ?? new Map()}
-            onMun={(id) => setGeo({ uf: id.slice(0, 2), mun: id })}
+            onMun={selecionarMun}
             avisoMun={avisoMun}
           />
         )}
@@ -466,10 +598,10 @@ export default function App() {
         {/* quebras */}
         <div className="grid gap-5 lg:grid-cols-3">
           <Card titulo="Programas" sub={`${NOME_METRICA[f.metrica]} · ${nomeGeo}`} nota={f.pg >= 0 ? "O filtro de programa não se aplica a este gráfico." : undefined}>
-            {dados ? <BarrasH itens={programas.filter((p) => p.v > 0)} fmt={fmt} cor="#45b675" ativo={f.pg >= 0 ? String(f.pg) : null} onClick={(k) => setF({ ...f, pg: f.pg === Number(k) ? -1 : Number(k) })} /> : <Skeleton className="h-48" />}
+            {dados ? <BarrasH itens={programas.filter((p) => p.v > 0)} fmt={fmt} cor="#2a78d6" ativo={f.pg >= 0 ? String(f.pg) : null} onClick={(k) => setF({ ...f, pg: f.pg === Number(k) ? -1 : Number(k) })} /> : <Skeleton className="h-48" />}
           </Card>
           <Card titulo="Fontes de recursos" sub={`${NOME_METRICA[f.metrica]} · ${nomeContexto}`} nota={geo.mun ? "A fonte de recursos é publicada por UF; o gráfico mostra o estado do município." : undefined}>
-            {dados ? <BarrasH itens={fontes.filter((p) => p.v > 0)} fmt={fmt} cor="#45b675" /> : <Skeleton className="h-48" />}
+            {dados ? <BarrasH itens={fontes.filter((p) => p.v > 0)} fmt={fmt} cor="#2a78d6" /> : <Skeleton className="h-48" />}
           </Card>
           <Card titulo="Quem toma o crédito" sub={`Sexo do beneficiário · ${nomeContexto}`} nota="Pessoas jurídicas e registros sem sexo informado aparecem separados.">
             {meta?.generoDisponivel === false ? (
@@ -478,7 +610,7 @@ export default function App() {
               <BarrasH
                 itens={meta.sexos.map((n, i) => ({ k: String(i), nome: n, v: valorMetrica(gen.get(i), f.metrica) })).filter((x) => x.v > 0)}
                 fmt={fmt}
-                cor="#45b675"
+                cor="#2a78d6"
               />
             ) : (
               <Skeleton className="h-32" />
@@ -492,7 +624,7 @@ export default function App() {
               <BarrasH
                 itens={prods.map((p) => ({ k: `${p.fin}${p.nome}`, nome: p.nome.charAt(0) + p.nome.slice(1).toLowerCase(), v: f.metrica === "contratos" ? p.q : p.v, extra: FIN_NOMES[p.fin] }))}
                 fmt={(v) => (f.metrica === "contratos" ? num(v) : brl(v))}
-                cor="#3987e5"
+                cor="#2a78d6"
               />
             ) : (
               <Skeleton className="h-72" />
@@ -501,17 +633,17 @@ export default function App() {
           <Card titulo="Instituições financeiras" sub={`Maiores concedentes · ${nomeContexto} · ${periodo}`}>
             {ifs ? (
               <>
-                <BarrasH itens={ifs.top.map((x, i) => ({ k: String(i) + x.nome, nome: x.nome, v: f.metrica === "contratos" ? x.q : f.metrica === "medio" ? (x.q ? x.v / x.q : 0) : x.v, extra: x.segmento }))} fmt={fmt} cor="#45b675" />
+                <BarrasH itens={ifs.top.map((x, i) => ({ k: String(i) + x.nome, nome: x.nome, v: f.metrica === "contratos" ? x.q : f.metrica === "medio" ? (x.q ? x.v / x.q : 0) : x.v, extra: x.segmento }))} fmt={fmt} cor="#2a78d6" />
                 {ifs.segmentos.length > 0 && (
-                  <div className="mt-4 border-t border-white/[0.06] pt-3">
-                    <div className="mb-2 text-[11px] uppercase tracking-wide text-white/45">Por segmento</div>
+                  <div className="mt-4 border-t border-stone-200 pt-3">
+                    <div className="mb-2 text-[11px] uppercase tracking-wide text-stone-500">Por segmento</div>
                     <div className="flex h-2.5 overflow-hidden rounded-full">
                       {ifs.segmentos.map((s, i) => {
                         const tot = ifs.segmentos.reduce((a, b) => a + (f.metrica === "contratos" ? b.q : b.v), 0) || 1;
-                        return <span key={s.nome} title={`${s.nome}: ${pct((f.metrica === "contratos" ? s.q : s.v) / tot).replace("+", "")}`} style={{ width: `${((f.metrica === "contratos" ? s.q : s.v) / tot) * 100}%`, background: COR_FIN[i % 4], opacity: i < 4 ? 1 : 0.5 }} className="border-r-2 border-[#121816] last:border-0" />;
+                        return <span key={s.nome} title={`${s.nome}: ${pct((f.metrica === "contratos" ? s.q : s.v) / tot).replace("+", "")}`} style={{ width: `${((f.metrica === "contratos" ? s.q : s.v) / tot) * 100}%`, background: COR_FIN[i % 4], opacity: i < 4 ? 1 : 0.5 }} className="border-r-2 border-[#ffffff] last:border-0" />;
                       })}
                     </div>
-                    <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-white/60">
+                    <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-stone-600">
                       {ifs.segmentos.slice(0, 6).map((s, i) => (
                         <span key={s.nome} className="flex items-center gap-1.5">
                           <i className="h-2 w-2 rounded-sm" style={{ background: COR_FIN[i % 4], opacity: i < 4 ? 1 : 0.5 }} />
@@ -530,35 +662,107 @@ export default function App() {
 
         {/* metodologia */}
         <Card titulo="Sobre os dados">
-          <div className="grid gap-4 text-[13px] leading-relaxed text-white/60 md:grid-cols-3">
+          <div className="grid gap-4 text-[13px] leading-relaxed text-stone-600 md:grid-cols-3">
             <p>
-              <b className="text-white/85">Fonte.</b> Matriz de Dados do Crédito Rural (MDCR), extraída do SICOR e publicada pelo Banco Central do Brasil em API OData aberta (licença ODbL). Os valores são nominais, em reais, pela data de emissão do contrato.
+              <b className="text-stone-800">Fonte.</b> Matriz de Dados do Crédito Rural (MDCR), extraída do SICOR e publicada pelo Banco Central do Brasil em API OData aberta (licença ODbL). Os valores são nominais, em reais, pela data de emissão do contrato.
             </p>
             <p>
-              <b className="text-white/85">Atualização.</b> Uma rotina diária consulta a API, reprocessa os meses mais recentes (que recebem registros tardios) e publica os agregados. No nível municipal, os detalhes mensais e por produto são consultados ao vivo no BCB quando você escolhe um município.
+              <b className="text-stone-800">Atualização.</b> Uma rotina diária consulta a API, reprocessa os meses mais recentes (que recebem registros tardios) e publica os agregados. No nível municipal, os detalhes mensais e por produto são consultados ao vivo no BCB quando você escolhe um município.
             </p>
             <p>
-              <b className="text-white/85">Limites.</b> Programas e fontes foram agrupados para leitura. Municípios criados após 2020 podem aparecer no ranking sem polígono no mapa. Comparações entre anos não descontam a inflação. Os totais por UF conferem com a soma municipal publicada pelo BCB.
+              <b className="text-stone-800">Limites.</b> Programas e fontes foram agrupados para leitura. Municípios criados após 2020 podem aparecer no ranking sem polígono no mapa. Comparações entre anos não descontam a inflação. Os totais por UF conferem com a soma municipal publicada pelo BCB.
             </p>
             <p className="md:col-span-3">
-              <b className="text-white/85">Crédito × produção.</b> O valor da produção vem da Produção Agrícola Municipal (PAM/IBGE, SIDRA tabela 5457, lavouras temporárias e permanentes). A comparação usa só o crédito de atividade agrícola e o quociente de localização (QL): QL acima de 1 indica que o município recebe uma fatia do crédito maior que sua fatia na produção. O QL mede proporção, não necessidade: municípios com muita lavoura de alto valor e pouco crédito podem se financiar com recursos próprios, cooperativas ou crédito fora do SNCR.
+              <b className="text-stone-800">Crédito × produção.</b> O valor da produção vem da Produção Agrícola Municipal (PAM/IBGE, SIDRA tabela 5457, lavouras temporárias e permanentes). A comparação usa só o crédito de atividade agrícola e o quociente de localização (QL): QL acima de 1 indica que o município recebe uma fatia do crédito maior que sua fatia na produção. O QL mede proporção, não necessidade: municípios com muita lavoura de alto valor e pouco crédito podem se financiar com recursos próprios, cooperativas ou crédito fora do SNCR.
             </p>
           </div>
         </Card>
+        </>
+        )}
       </main>
+      )}
 
-      <footer className="mx-auto mt-8 flex max-w-[1400px] flex-col items-center justify-between gap-3 border-t border-white/[0.06] pt-5 text-xs text-white/40 sm:flex-row">
+      {mobile && meta && (
+        <>
+          {filtrosAbertos && aba === "credito" && (
+            <div className="fixed inset-0 z-40 flex flex-col justify-end bg-stone-900/30" onClick={() => setFiltrosAbertos(false)}>
+              <div className="pb-seguro max-h-[85vh] overflow-y-auto rounded-t-2xl bg-[#f7f7f4] px-4 pt-3 shadow-2xl" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Filtros">
+                <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-stone-300" />
+                <div className="mb-2 flex items-center justify-between">
+                  <h2 className="text-base font-semibold text-stone-900">Filtros</h2>
+                  <button onClick={() => setFiltrosAbertos(false)} aria-label="Fechar filtros" className="rounded-lg p-1.5 text-stone-500 hover:bg-stone-100">
+                    <Fechar size={18} />
+                  </button>
+                </div>
+                <BarraFiltros meta={meta} f={f} setF={setF} geo={geo} setGeo={(g) => { setGeo(g); if (g.mun) { setSubAba("resumo"); setFiltrosAbertos(false); } }} nomeMun={base?.nomeMun ?? new Map()} emPainel />
+                <button onClick={() => setFiltrosAbertos(false)} className="mt-4 mb-2 w-full rounded-xl bg-emerald-700 py-3 text-sm font-semibold text-white">
+                  Ver resultados
+                </button>
+              </div>
+            </div>
+          )}
+          {aba === "credito" && !filtrosAbertos && (
+            <button
+              onClick={() => setFiltrosAbertos(true)}
+              aria-label="Abrir filtros"
+              className="fixed bottom-20 right-4 z-30 flex items-center gap-2 rounded-full bg-emerald-700 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-900/20"
+            >
+              <SlidersHorizontal size={16} /> Filtros
+            </button>
+          )}
+          <nav aria-label="Navegação" className="pb-seguro fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-stone-200 bg-white/95 backdrop-blur">
+            {(
+              [
+                ["resumo", "Resumo", LayoutDashboard],
+                ["mapa", "Mapa", MapaIcone],
+                ["ranking", "Ranking", ListOrdered],
+                ["analises", "Análises", BarChart3],
+              ] as [SubAba, string, typeof MapaIcone][]
+            ).map(([k, t, Icone]) => {
+              const ativo = aba === "credito" && subAba === k;
+              return (
+                <button
+                  key={k}
+                  onClick={() => {
+                    setAba("credito");
+                    setSubAba(k);
+                    window.scrollTo({ top: 0 });
+                  }}
+                  aria-current={ativo ? "page" : undefined}
+                  className={`flex flex-col items-center gap-0.5 py-2 text-[11px] font-medium ${ativo ? "text-emerald-700" : "text-stone-500"}`}
+                >
+                  <Icone size={20} />
+                  {t}
+                </button>
+              );
+            })}
+            <button
+              onClick={() => {
+                setAba("risco");
+                window.scrollTo({ top: 0 });
+              }}
+              aria-current={aba === "risco" ? "page" : undefined}
+              className={`flex flex-col items-center gap-0.5 py-2 text-[11px] font-medium ${aba === "risco" ? "text-emerald-700" : "text-stone-500"}`}
+            >
+              <ShieldAlert size={20} />
+              Risco
+            </button>
+          </nav>
+        </>
+      )}
+
+      <footer className="mx-auto mt-8 flex max-w-[1400px] flex-col items-center justify-between gap-3 border-t border-stone-200 pt-5 text-xs text-stone-500 sm:flex-row">
         <span>
-          Feito por <b className="text-white/70">Lúcio Benfica</b> · dados abertos do{" "}
-          <a className="underline decoration-white/20 hover:text-white" href={meta?.fonteUrl} target="_blank" rel="noreferrer">
+          Feito por <b className="text-stone-700">Lúcio Benfica</b> · dados abertos do{" "}
+          <a className="underline decoration-stone-300 hover:text-stone-900" href={meta?.fonteUrl} target="_blank" rel="noreferrer">
             Banco Central do Brasil <ExternalLink size={10} className="inline" />
           </a>{" "}
           e do{" "}
-          <a className="underline decoration-white/20 hover:text-white" href="https://sidra.ibge.gov.br/tabela/5457" target="_blank" rel="noreferrer">
+          <a className="underline decoration-stone-300 hover:text-stone-900" href="https://sidra.ibge.gov.br/tabela/5457" target="_blank" rel="noreferrer">
             IBGE (PAM) <ExternalLink size={10} className="inline" />
           </a>
         </span>
-        <a href="https://github.com/Benfluc" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 hover:text-white">
+        <a href="https://github.com/Benfluc" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 hover:text-stone-900">
           <Github size={14} /> github.com/Benfluc
         </a>
       </footer>

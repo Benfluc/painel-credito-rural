@@ -29,6 +29,7 @@ contratos ou valor médio).
 | `atualizar-microdados.yml` (diário) | [Microdados do SICOR](https://www.bcb.gov.br/estabilidadefinanceira/tabelas-credito-rural-proagro), arquivos `.gz` mensais | **Base principal**: Brasil e UFs completos (mês, finalidade, atividade, programa, fonte, produto, instituição) e municípios **parciais** |
 | `atualizar-dados.yml` (diário) | API OData do SICOR (Olinda) | Completa o que os microdados não trazem: município de **todas** as operações e sexo do beneficiário. Se a API estiver fora, termina em ~1 min |
 | `atualizar-pam.yml` (semanal) | IBGE SIDRA 5457 | Produção agrícola municipal |
+| `atualizar-inadimplencia.yml` (diário) | SCR.data + SGS (BCB) | Inadimplência do crédito rural por UF e série nacional oficial |
 
 Os microdados públicos só trazem o município das operações com recursos públicos ou Proagro (arquivo
 `SICOR_COMPLEMENTO_OPERACAO_BASICA`). Em 2023, isso cobriu 78% dos contratos e 33% do valor; ficam de fora
@@ -39,6 +40,28 @@ completos.
 Conferência: em 2023, os microdados batem com a API da Matriz no custeio de MG (R$ 29.409.567.821 contra
 R$ 29.409.567.815; 120.342 contratos nos dois) e nos totais nacionais (diferença de 0,001% no custeio, por registros
 posteriores).
+
+## Risco e inadimplência
+
+Aba própria no painel (`?aba=risco`), com duas fontes do Banco Central:
+
+- **SCR.data** ([dados abertos](https://dadosabertos.bcb.gov.br/dataset/scr_data)): arquivos anuais
+  `scrdata_{ANO}.zip`, com um CSV por mês desde jun/2012. Usa só a modalidade *Financiamentos rurais e
+  agroindustriais*. Dá carteira ativa, carteira inadimplida (operações com parcela vencida há mais de 90 dias),
+  vencido acima de 90 dias e ativo problemático, por UF, PF/PJ, submodalidade, porte, origem dos recursos e
+  segmento da instituição.
+- **SGS**: séries oficiais da inadimplência do crédito rural (recursos direcionados, atraso > 90 dias), nacionais:
+  21148 (PF), 21136 (PJ), 21146 (PF com taxas de mercado) e 21147 (PF com taxas reguladas).
+
+Limitações, exibidas também no app:
+- A modalidade do SCR.data junta crédito rural e financiamentos agroindustriais; o filtro de submodalidade ajuda a
+  separar as linhas.
+- Não há dado por município.
+- O SCR.data sai com cerca de 2 meses de defasagem e pode divergir de outras publicações do BCB.
+- O conceito de ativo problemático mudou em jan/2025.
+
+O ETL (`etl/inadimplencia_etl.py`, workflow `atualizar-inadimplencia.yml`) só baixa os anos cujo arquivo mudou
+e grava em `inad_meta.json` as submodalidades encontradas, para conferência.
 
 ## Crédito × produção agrícola (PAM/IBGE)
 

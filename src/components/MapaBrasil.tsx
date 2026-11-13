@@ -55,7 +55,7 @@ export default function MapaBrasil({ geo, sel, nivelMun, valoresUF, valoresMun, 
     if (!div.current) return;
     const m = new maplibregl.Map({
       container: div.current,
-      style: { version: 8, sources: {}, layers: [{ id: "bg", type: "background", paint: { "background-color": "#0d1412" } }] },
+      style: { version: 8, sources: {}, layers: [{ id: "bg", type: "background", paint: { "background-color": "#f4f5f1" } }] },
       bounds: BR,
       fitBoundsOptions: { padding: 16 },
       attributionControl: false,
@@ -73,13 +73,13 @@ export default function MapaBrasil({ geo, sel, nivelMun, valoresUF, valoresMun, 
         source: "uf",
         paint: { "fill-color": ["coalesce", ["feature-state", "c"], COR_ZERO], "fill-opacity": ["coalesce", ["feature-state", "o"], 1] },
       });
-      m.addLayer({ id: "uf-line", type: "line", source: "uf", paint: { "line-color": "#0d1412", "line-width": 1.2 } });
+      m.addLayer({ id: "uf-line", type: "line", source: "uf", paint: { "line-color": "#f4f5f1", "line-width": 1.2 } });
       m.addLayer({
         id: "uf-hover",
         type: "line",
         source: "uf",
         filter: ["==", ["get", "uf"], ""],
-        paint: { "line-color": "#e8f5ec", "line-width": 2 },
+        paint: { "line-color": "#1c1b19", "line-width": 2 },
       });
       setPronto(true);
     });
@@ -160,7 +160,7 @@ export default function MapaBrasil({ geo, sel, nivelMun, valoresUF, valoresMun, 
         type: "line",
         source: "mun",
         layout: { visibility: "none" },
-        paint: { "line-color": "#0d1412", "line-width": ["interpolate", ["linear"], ["zoom"], 3, 0.1, 6, 0.5, 9, 1] },
+        paint: { "line-color": "#f4f5f1", "line-width": ["interpolate", ["linear"], ["zoom"], 3, 0.1, 6, 0.5, 9, 1] },
       },
       "uf-line",
     );
@@ -169,14 +169,14 @@ export default function MapaBrasil({ geo, sel, nivelMun, valoresUF, valoresMun, 
       type: "line",
       source: "mun",
       filter: ["==", ["get", "id"], ""],
-      paint: { "line-color": "#e8f5ec", "line-width": 1.5 },
+      paint: { "line-color": "#1c1b19", "line-width": 1.5 },
     });
     m.addLayer({
       id: "mun-sel",
       type: "line",
       source: "mun",
       filter: ["==", ["get", "id"], ""],
-      paint: { "line-color": "#ffffff", "line-width": 2.5 },
+      paint: { "line-color": "#1c1b19", "line-width": 2.5 },
     });
 
     m.on("mousemove", "mun-fill", (e) => {
@@ -221,7 +221,7 @@ export default function MapaBrasil({ geo, sel, nivelMun, valoresUF, valoresMun, 
     for (const f of geo.uf.features) {
       const uf = f.properties.uf;
       const dentro = !sel.uf || sel.uf === uf;
-      const cor = mostrarMun ? "#151b19" : pintura ? pintura.uf(uf) : corDe(valorMetrica(valoresUF.get(uf), metrica), quebras);
+      const cor = mostrarMun ? "#ecebe6" : pintura ? pintura.uf(uf) : corDe(valorMetrica(valoresUF.get(uf), metrica), quebras);
       m.setFeatureState({ source: "uf", id: uf }, { c: cor, o: dentro ? 1 : 0.35 });
     }
     if (m.getSource("mun") && geo.mun) {
@@ -271,7 +271,7 @@ export default function MapaBrasil({ geo, sel, nivelMun, valoresUF, valoresMun, 
             t: "Voltar ao Brasil",
           },
         ].map((b) => (
-          <button key={b.t} onClick={b.f} title={b.t} aria-label={b.t} className="grid h-8 w-8 place-items-center rounded-lg border border-white/10 bg-black/50 text-white/80 backdrop-blur transition hover:bg-black/70 hover:text-white">
+          <button key={b.t} onClick={b.f} title={b.t} aria-label={b.t} className="grid h-8 w-8 place-items-center rounded-lg border border-stone-200 bg-white/90 shadow-sm text-stone-700 backdrop-blur transition hover:bg-white hover:text-stone-900">
             {b.i}
           </button>
         ))}
@@ -279,10 +279,10 @@ export default function MapaBrasil({ geo, sel, nivelMun, valoresUF, valoresMun, 
 
       {/* legenda */}
       {pintura ? (
-        <div className="absolute bottom-3 left-3 max-w-[calc(100%-1.5rem)] rounded-lg border border-white/10 bg-black/60 px-3 py-2 text-[11px] text-white/70 backdrop-blur">{pintura.legenda}</div>
+        <div className="absolute bottom-3 left-3 max-w-[calc(100%-1.5rem)] rounded-lg border border-stone-200 bg-white/90 shadow-sm px-3 py-2 text-[11px] text-stone-700 backdrop-blur">{pintura.legenda}</div>
       ) : legenda.quebras.length > 0 && (
-        <div className="absolute bottom-3 left-3 rounded-lg border border-white/10 bg-black/55 px-3 py-2 text-[11px] text-white/70 backdrop-blur">
-          <div className="mb-1.5 font-medium text-white/85">
+        <div className="absolute bottom-3 left-3 rounded-lg border border-stone-200 bg-white/90 shadow-sm px-3 py-2 text-[11px] text-stone-700 backdrop-blur">
+          <div className="mb-1.5 font-medium text-stone-800">
             {NOME_METRICA[metrica]} · {mostrarMun ? "municípios" : "estados"}
           </div>
           <div className="flex items-center gap-[2px]">
@@ -300,18 +300,18 @@ export default function MapaBrasil({ geo, sel, nivelMun, valoresUF, valoresMun, 
       )}
 
       {!geo.mun && (nivelMun || sel.uf) && (
-        <div className="absolute inset-x-0 top-3 mx-auto w-fit rounded-full bg-black/60 px-3 py-1 text-xs text-white/80">Carregando malha municipal…</div>
+        <div className="absolute inset-x-0 top-3 mx-auto w-fit rounded-full bg-white/90 shadow-sm px-3 py-1 text-xs text-stone-700">Carregando malha municipal…</div>
       )}
 
       {hover && (
         <div
-          className="pointer-events-none absolute z-10 min-w-40 rounded-lg border border-white/10 bg-[#0b100e]/95 px-3 py-2 text-xs shadow-xl"
+          className="pointer-events-none absolute z-10 min-w-40 rounded-lg border border-stone-200 bg-white/95 px-3 py-2 text-xs shadow-xl"
           style={{ left: Math.min(hover.x + 14, (div.current?.clientWidth ?? 400) - 190), top: hover.y + 14 }}
         >
-          <div className="font-semibold text-white">{hover.titulo}</div>
-          <div className="text-white/50">{hover.sub}</div>
-          <div className="mt-1 text-sm font-semibold tabular-nums text-emerald-300">{hover.valor}</div>
-          <div className="text-[10px] uppercase tracking-wide text-white/40">{hover.rotulo ?? NOME_METRICA[metrica]}</div>
+          <div className="font-semibold text-stone-900">{hover.titulo}</div>
+          <div className="text-stone-500">{hover.sub}</div>
+          <div className="mt-1 text-sm font-semibold tabular-nums text-emerald-700">{hover.valor}</div>
+          <div className="text-[10px] uppercase tracking-wide text-stone-500">{hover.rotulo ?? NOME_METRICA[metrica]}</div>
         </div>
       )}
     </div>

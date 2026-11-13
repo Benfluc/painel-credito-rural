@@ -13,15 +13,15 @@ export function Card({ titulo, sub, acao, children, className = "", nota }: { ti
       {(titulo || acao) && (
         <header className="mb-3 flex items-start justify-between gap-3">
           <div>
-            {titulo && <h2 className="text-[15px] font-semibold text-white">{titulo}</h2>}
-            {sub && <p className="mt-0.5 text-xs text-white/50">{sub}</p>}
+            {titulo && <h2 className="text-[15px] font-semibold text-stone-900">{titulo}</h2>}
+            {sub && <p className="mt-0.5 text-xs text-stone-500">{sub}</p>}
           </div>
           {acao}
         </header>
       )}
       <div className="min-h-0 flex-1">{children}</div>
       {nota && (
-        <p className="mt-3 flex items-start gap-1.5 text-[11px] leading-snug text-white/40">
+        <p className="mt-3 flex items-start gap-1.5 text-[11px] leading-snug text-stone-500">
           <Info size={12} className="mt-px shrink-0" />
           <span>{nota}</span>
         </p>
@@ -32,14 +32,14 @@ export function Card({ titulo, sub, acao, children, className = "", nota }: { ti
 
 export function Segmentado<T extends string | number>({ valor, opcoes, onChange, rotulo }: { valor: T; opcoes: { v: T; t: string }[]; onChange: (v: T) => void; rotulo: string }) {
   return (
-    <div role="radiogroup" aria-label={rotulo} className="inline-flex rounded-lg border border-white/10 bg-white/[0.03] p-0.5">
+    <div role="radiogroup" aria-label={rotulo} className="inline-flex rounded-lg border border-stone-200 bg-stone-100 p-0.5">
       {opcoes.map((o) => (
         <button
           key={String(o.v)}
           role="radio"
           aria-checked={valor === o.v}
           onClick={() => onChange(o.v)}
-          className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${valor === o.v ? "bg-emerald-400/15 text-emerald-200 ring-1 ring-emerald-400/30" : "text-white/60 hover:text-white"}`}
+          className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${valor === o.v ? "bg-emerald-100 text-emerald-800 ring-1 ring-emerald-600/30" : "text-stone-600 hover:text-stone-900"}`}
         >
           {o.t}
         </button>
@@ -49,14 +49,14 @@ export function Segmentado<T extends string | number>({ valor, opcoes, onChange,
 }
 
 export function Vazio({ children }: { children: ReactNode }) {
-  return <div className="grid h-full min-h-32 place-items-center px-6 text-center text-sm text-white/40">{children}</div>;
+  return <div className="grid h-full min-h-32 place-items-center px-6 text-center text-sm text-stone-500">{children}</div>;
 }
 
 /** Lista de barras horizontais com rótulo e valor (para rankings e quebras). */
 export function BarrasH({
   itens,
   fmt,
-  cor = "#45b675",
+  cor = "#2a78d6",
   onClick,
   ativo,
   max,
@@ -78,16 +78,16 @@ export function BarrasH({
           <li key={it.k}>
             <Comp
               {...(onClick ? { onClick: () => onClick(it.k), title: `Selecionar ${it.nome}` } : {})}
-              className={`group grid w-full grid-cols-[1.25rem_minmax(0,1fr)_auto] items-center gap-x-2 rounded-md px-1.5 py-1 text-left text-[13px] transition ${onClick ? "hover:bg-white/5" : ""} ${ativo === it.k ? "bg-emerald-400/10" : ""}`}
+              className={`group grid w-full grid-cols-[1.25rem_minmax(0,1fr)_auto] items-center gap-x-2 rounded-md px-1.5 py-1 text-left text-[13px] transition ${onClick ? "hover:bg-stone-100" : ""} ${ativo === it.k ? "bg-emerald-50" : ""}`}
             >
-              <span className="text-[11px] tabular-nums text-white/35">{i + 1}</span>
-              <span className="truncate text-white/85">
+              <span className="text-[11px] tabular-nums text-stone-400">{i + 1}</span>
+              <span className="truncate text-stone-800">
                 {it.nome}
-                {it.extra && <span className="ml-1.5 text-[11px] text-white/40">{it.extra}</span>}
+                {it.extra && <span className="ml-1.5 text-[11px] text-stone-500">{it.extra}</span>}
               </span>
-              <span className="text-right text-[12px] font-medium tabular-nums text-white/80">{fmt(it.v)}</span>
+              <span className="text-right text-[12px] font-medium tabular-nums text-stone-700">{fmt(it.v)}</span>
               <span />
-              <span className="col-span-2 mt-1 block h-1.5 overflow-hidden rounded-full bg-white/[0.05]">
+              <span className="col-span-2 mt-1 block h-1.5 overflow-hidden rounded-full bg-stone-100">
                 <motion.span
                   className="block h-full rounded-full"
                   style={{ background: cor }}
@@ -105,5 +105,5 @@ export function BarrasH({
 }
 
 export function Skeleton({ className = "" }: { className?: string }) {
-  return <div className={`animate-pulse rounded-lg bg-white/[0.04] ${className}`} />;
+  return <div className={`animate-pulse rounded-lg bg-stone-100 ${className}`} />;
 }

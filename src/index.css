@@ -1,32 +1,38 @@
 @import "tailwindcss";
 
 :root {
-  color-scheme: dark;
+  color-scheme: light;
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  background: #0b1210;
-  color: #f0efec;
+  background: #f7f7f4;
+  color: #1c1b19;
 }
 
 body {
   margin: 0;
   background:
-    radial-gradient(1200px 600px at 10% -10%, rgba(52, 211, 153, 0.10), transparent 60%),
-    radial-gradient(900px 500px at 100% 0%, rgba(163, 230, 53, 0.06), transparent 60%),
-    #0b1210;
+    radial-gradient(1100px 500px at 0% -10%, rgba(16, 185, 129, 0.08), transparent 60%),
+    radial-gradient(900px 500px at 100% 0%, rgba(42, 120, 214, 0.06), transparent 60%),
+    #f7f7f4;
   min-height: 100vh;
 }
 
 .card {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.02));
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: #ffffff;
+  border: 1px solid #e7e5e0;
   border-radius: 1rem;
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 20px 40px -24px rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(12px);
+  box-shadow: 0 1px 2px rgba(28, 27, 25, 0.04), 0 12px 32px -20px rgba(28, 27, 25, 0.18);
 }
 
 .tabular-nums { font-variant-numeric: tabular-nums; }
 
 .maplibregl-canvas:focus { outline: none; }
+
+/* rolagem horizontal sem barra (carrosséis no celular) */
+.rolagem-x { overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; }
+.rolagem-x::-webkit-scrollbar { display: none; }
+.rolagem-x > * { scroll-snap-align: start; }
+
+.pb-seguro { padding-bottom: calc(env(safe-area-inset-bottom) + 0.5rem); }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }

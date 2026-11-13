@@ -1,0 +1,60 @@
+name: Atualizar inadimplência (SCR.data + SGS)
+
+# SCR.data sai uma vez por mês (com ~2 meses de defasagem). A execução diária só baixa
+# os anos cujo arquivo mudou no BCB; os demais vêm do cache de agregados.
+on:
+  schedule:
+    - cron: "47 12 * * *" # todo dia às 09:47 (Brasília)
+  workflow_dispatch:
+    inputs:
+      inicio:
+        description: "Ano inicial (o SCR.data começa em 2012)"
+        default: "2012"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: dados-inadimplencia
+  cancel-in-progress: false
+
+jobs:
+  inadimplencia:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Restaurar agregados anteriores
+        uses: actions/cache/restore@v4
+        with:
+          path: .cache/scrdata
+          key: scrdata-${{ github.run_id }}
+          restore-keys: scrdata-
+
+      - name: Baixar e agregar
+        run: python etl/inadimplencia_etl.py --inicio "${{ github.event.inputs.inicio || '2012' }}" --out public/data --cache .cache/scrdata
+
+      - name: Salvar agregados
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: .cache/scrdata
+          key: scrdata-${{ github.run_id }}
+
+      - name: Publicar dados novos
+        run: |
+          if git diff --quiet -- public/data ':!public/data/inad_meta.json' && [ -z "$(git ls-files --others --exclude-standard public/data)" ]; then
+            echo "Sem dados novos."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/data
+          git commit -m "dados: inadimplência (SCR.data + SGS) $(date -u +%Y-%m-%d)"
+          git pull --rebase
+          git push
