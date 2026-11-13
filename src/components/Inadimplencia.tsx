@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis, type TooltipProps } from "recharts";
 import { TriangleAlert } from "lucide-react";
 import MapaBrasil, { type Pintura } from "./MapaBrasil";
+import ContratacoesInad from "./ContratacoesInad";
 import { BarrasH, Card, Segmentado, Skeleton, Vazio } from "./ui";
 import type { GeoBase } from "../lib/geo";
 import type { Meta } from "../lib/data";
@@ -204,7 +205,7 @@ export default function Inadimplencia({ meta, base, uf, setUf, mobile }: Props) 
       </details>
 
       {/* KPIs */}
-      <div className={mobile ? "rolagem-x -mx-4 flex gap-3 px-4 pb-1 [&>*]:min-w-[72%]" : "grid grid-cols-2 gap-3 lg:grid-cols-5"}>
+      <div className={mobile ? "grid grid-cols-1 gap-2.5" : "grid grid-cols-2 gap-3 lg:grid-cols-5"}>
         {[
           { r: `${NOME_IND[f.ind]} · ${nomeEscopo}`, v: pctT(taxa(atual)), d: Number.isFinite(delta) ? `${pp(delta)} em 12 meses` : mesAno(f.ym), cor: delta > 0 ? "text-rose-600" : "text-emerald-700" },
           { r: "Carteira ativa", v: brl(atual.cart), d: `${num(atual.ops, true)} operações` },
@@ -278,6 +279,9 @@ export default function Inadimplencia({ meta, base, uf, setUf, mobile }: Props) 
           </ResponsiveContainer>
         </div>
       </Card>
+
+      {/* contratações × inadimplência */}
+      {f.ym && <ContratacoesInad meta={meta} d={d} f={f} uf={uf} setUf={setUf} mobile={mobile} />}
 
       {/* recortes */}
       <div className="grid gap-5 lg:grid-cols-3">

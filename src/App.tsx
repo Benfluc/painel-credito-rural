@@ -93,9 +93,9 @@ function Github({ size = 14 }: { size?: number }) {
 
 function Kpi({ rotulo, valor, detalhe, delta, i }: { rotulo: string; valor: string; detalhe?: string; delta?: number | null; i: number }) {
   return (
-    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }} className="card p-4">
+    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }} className="card px-4 py-3 md:p-4">
       <div className="text-[11px] font-medium uppercase tracking-wide text-stone-500">{rotulo}</div>
-      <div className="mt-1.5 text-2xl font-semibold tracking-tight text-stone-900">{valor}</div>
+      <div className="mt-1 text-xl font-semibold tracking-tight text-stone-900 md:mt-1.5 md:text-2xl">{valor}</div>
       <div className="mt-1 flex items-center gap-2 text-xs">
         {delta != null && Number.isFinite(delta) && (
           <span className={`font-medium tabular-nums ${delta >= 0 ? "text-emerald-700" : "text-rose-600"}`}>
@@ -436,7 +436,7 @@ export default function App() {
       <main className="mx-auto max-w-[1400px] space-y-5 md:mt-5">
         {/* KPIs */}
         {vis("resumo") && !(mobile && geo.mun) && (
-        <div className={mobile ? "rolagem-x -mx-4 flex gap-3 px-4 pb-1 [&>*]:min-w-[72%]" : "grid grid-cols-2 gap-3 lg:grid-cols-5"}>
+        <div className={mobile ? "grid grid-cols-1 gap-2.5" : "grid grid-cols-2 gap-3 lg:grid-cols-5"}>
           {kpi ? (
             <>
               <Kpi i={0} rotulo={`Valor contratado · ${periodo}`} valor={brl(kpi.atual.v)} delta={kpi.prev && kpi.prev.v ? kpi.atual.v / kpi.prev.v - 1 : null} detalhe={kpi.prev ? `vs. ${periodoAnterior}` : geo.mun && munParcial ? "só crédito público/Proagro" : nomeGeo} />
