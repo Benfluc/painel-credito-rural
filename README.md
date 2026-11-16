@@ -1,188 +1,207 @@
-# 🌱 Painel do Crédito Rural no Brasil
+# 🌱 Brazil Rural Credit Dashboard
 
-Dashboard interativo, aberto e gratuito sobre as contratações de **crédito rural no Brasil**, com dados oficiais da
-[Matriz de Dados do Crédito Rural (SICOR/Banco Central)](https://dadosabertos.bcb.gov.br/dataset/matrizdadoscreditorural).
+**English** · [Português](README_pt.md)
 
-Explore **custeio, investimento, comercialização e industrialização** do Brasil inteiro até o município. Os recortes
-disponíveis são ano, atividade (agrícola/pecuária), programa (Pronaf, Pronamp, RenovAgro…) e métrica (valor, número de
-contratos ou valor médio).
+An interactive, open and free dashboard on **rural credit in Brazil**: where the money is lent, what it is for, how
+closely it follows agricultural output and how delinquency is evolving. It uses official data from the Central Bank of
+Brazil (SICOR, SCR.data and SGS) and IBGE (Municipal Agricultural Production), updated automatically.
 
-## Funcionalidades
+**🔗 Live:** https://painel-credito-rural.vercel.app
 
-- **Mapa coroplético** (MapLibre GL) com navegação Brasil → estado → município, hover e clique para detalhar
-- Alternância **estados / municípios** no nível nacional (5,5 mil polígonos renderizados em WebGL)
-- **KPIs**: valor contratado, contratos, ticket médio, área financiada, participação no Brasil e variação contra o
-  *mesmo período* do ano anterior (para não comparar ano parcial com ano fechado)
-- **Ranking** de estados ou municípios, com clique para selecionar
-- **Série mensal** e **série histórica anual** empilhadas por finalidade
-- Quebras por **programa**, **fonte de recursos**, **sexo do beneficiário**, **produtos financiados** e **instituições
-  financeiras** (com segmento)
-- **Consulta ao vivo no BCB** ao escolher um município: série mensal e produtos de custeio/investimento vêm direto da API
-- **Busca de município** com autocompletar (ignora acentos)
-- **URL compartilhável**: todo filtro fica na URL (`?ano=2025&uf=31&mun=3143302&at=1`)
-- Responsivo, tema escuro, respeita `prefers-reduced-motion`
+> The interface is in Brazilian Portuguese.
 
-## Fontes do crédito: microdados + API
+![Dashboard overview](docs/img/visao-geral.jpg)
 
-| Workflow | Fonte | O que gera |
+## What the dashboard shows
+
+### Loan contracts (SICOR)
+
+- **Interactive map** from Brazil → state → municipality, covering **operating costs (custeio), investment, marketing
+  and processing** loans. Filters for year, activity (crop/livestock), program (Pronaf, Pronamp, RenovAgro…) and metric
+  (amount, number of contracts or average amount).
+- **Indicators**: amount lent, contracts, average amount, financed area and share of Brazil. Changes are always
+  measured against the **same period** of the previous year, so a partial year is never compared with a full one.
+- **Ranking** of states or municipalities, clickable to select.
+- **Monthly and historical series** (since 2013) by loan purpose.
+- Breakdowns by **program**, **funding source**, **borrower sex**, **financed products** and **financial
+  institutions**.
+- **Municipality profile**: clicking a municipality shows its amount, contracts, area, share of the state, rank within
+  the state and the country, programs, crop × livestock split and main crops from the PAM.
+- **Easy map navigation**: to return to Brazil, zoom out, click outside the state or use the ← Brasil button.
+
+![State selected](docs/img/estado.jpg)
+
+![Municipality profile](docs/img/ficha-municipio.jpg)
+
+### Credit × agricultural output (PAM/IBGE)
+
+The dashboard cross-references credit with IBGE's **Municipal Agricultural Production** survey
+([SIDRA 5457](https://sidra.ibge.gov.br/tabela/5457)), which covers both temporary and permanent crops (including
+coffee, oranges, bananas and cocoa).
+
+- **"Credit × Production" map** using the location quotient (LQ):
+  LQ = (municipality's credit ÷ reference credit) ÷ (municipality's output ÷ reference output).
+  The reference is Brazil or, when a state is selected, that state.
+- **Scatter plot** of credit × output by municipality (log scale), with the LQ = 1 line.
+- **Indicators**: R$ of credit per R$ 100 of output, Spearman correlation, % of output in municipalities with no crop
+  credit and the number of municipalities with LQ ≥ 2 or < 0.5.
+- **By crop**: share of output value × share of crop operating credit (soybeans, coffee, corn, sugarcane…).
+- A **"next year's PAM"** option, because one year's operating credit largely finances the harvest of the following
+  year. When that year's PAM has not been published yet, the dashboard says so.
+
+### Risk and delinquency (SCR.data + SGS)
+
+A dedicated tab (`?aba=risco`):
+
+- **State map and ranking** of the delinquency rate, the amount overdue by more than 90 days or problem assets, with
+  filters for reference date, sub-modality (operating costs, investment, marketing…) and individuals/companies.
+- **Indicators**: rate, active portfolio, delinquent portfolio, problem assets and the official BCB series.
+- **Monthly trend** since June 2012, compared with the official rural credit series (SGS 21148 and 21136).
+- **Loans × delinquency**: monthly lending and the delinquency rate on the same time axis, plus a state-level chart
+  that compares 12-month lending growth with current delinquency.
+- National breakdowns by **borrower size**, **funding origin** and **institution segment**.
+
+![Risk and delinquency](docs/img/risco.jpg)
+
+![Loans × delinquency](docs/img/contratacoes-inadimplencia.jpg)
+
+### Mobile
+
+A dedicated layout with bottom tabs (Summary, Map, Ranking, Analyses and Risk), filters in a slide-up panel and stacked
+indicators. Every filter is stored in the URL, so any view can be shared (`?ano=2026&uf=31&mun=3143302`).
+
+<img src="docs/img/celular.jpg" alt="Dashboard on a phone" width="280">
+
+## Data sources
+
+| Source | What it provides | Refresh |
 |---|---|---|
-| `atualizar-microdados.yml` (diário) | [Microdados do SICOR](https://www.bcb.gov.br/estabilidadefinanceira/tabelas-credito-rural-proagro), arquivos `.gz` mensais | **Base principal**: Brasil e UFs completos (mês, finalidade, atividade, programa, fonte, produto, instituição) e municípios **parciais** |
-| `atualizar-dados.yml` (diário) | API OData do SICOR (Olinda) | Completa o que os microdados não trazem: município de **todas** as operações e sexo do beneficiário. Se a API estiver fora, termina em ~1 min |
-| `atualizar-pam.yml` (semanal) | IBGE SIDRA 5457 | Produção agrícola municipal |
-| `atualizar-inadimplencia.yml` (diário) | SCR.data + SGS (BCB) | Inadimplência do crédito rural por UF e série nacional oficial |
+| [SICOR microdata](https://www.bcb.gov.br/estabilidadefinanceira/tabelas-credito-rural-proagro) (BCB) | Main loan dataset, since 2013 | Daily |
+| [Rural Credit Data Matrix API](https://dadosabertos.bcb.gov.br/dataset/matrizdadoscreditorural) (BCB) | Municipality of every operation and borrower sex; live query for the municipality profile | Daily |
+| [SCR.data](https://dadosabertos.bcb.gov.br/dataset/scr_data) (BCB) | Rural credit portfolio and delinquency by state, since June 2012 | Daily |
+| SGS (BCB) | Official rural credit delinquency series (21148, 21136, 21146, 21147) | Daily |
+| [PAM/IBGE](https://sidra.ibge.gov.br/tabela/5457) (SIDRA 5457) | Harvested area and output value by municipality and crop | Weekly |
+| IBGE boundaries, via [geodata-br](https://github.com/tbrugz/geodata-br) | State and municipality outlines | — |
 
-Os microdados públicos só trazem o município das operações com recursos públicos ou Proagro (arquivo
-`SICOR_COMPLEMENTO_OPERACAO_BASICA`). Em 2023, isso cobriu 78% dos contratos e 33% do valor; ficam de fora
-principalmente LCA e recursos livres não equalizados. O ETL grava essa cobertura por ano em `meta.munCobertura`, e o
-painel avisa sempre que mostra municípios. Quando a API volta, o workflow da API substitui os municípios pelos dados
-completos.
+## Methodology and limitations
 
-Conferência: em 2023, os microdados batem com a API da Matriz no custeio de MG (R$ 29.409.567.821 contra
-R$ 29.409.567.815; 120.342 contratos nos dois) e nos totais nacionais (diferença de 0,001% no custeio, por registros
-posteriores).
+- **Nominal values** (not adjusted for inflation), by contract **issue date**.
+- **Grouped programs**: Pronaf (0001), Pronamp (0050), No program (0999), RenovAgro/ABC+ (0156, 0222, 0180) and Others.
+- **Grouped funding sources**: mandatory resources, rural savings, LCA (agribusiness credit notes), free resources,
+  constitutional funds, BNDES/Finame and others.
+- Funding source, products, institutions and sex are published **by state only**. In a municipality profile, those
+  charts show its state.
+- **Municipalities**: the public microdata only identify the municipality of operations funded with public resources or
+  covered by Proagro (in 2023, 78% of contracts and 33% of the amount). The Data Matrix API fills in the rest. The
+  dashboard records coverage by year and warns when it is partial.
+- **Credit × output**: only crop credit is included, because the PAM does not cover livestock. The LQ measures
+  proportion, not credit need.
+- **Delinquency**: the SCR.data modality combines rural credit and agro-industrial financing (the sub-modality filter
+  separates the lines); there is no municipal data; SCR.data is published with a lag of about 2 months and may differ
+  from other BCB publications; the definition of problem assets changed in January 2025.
+- **Loans × delinquency**: lending is a flow and delinquency is a stock, and arrears appear months after a loan is
+  granted. The comparison shows association, not causation. SICOR state data do not split individuals and companies.
+- The simplified municipal boundaries do not include the newest municipalities, and the Paraty (RJ) polygon is
+  incomplete in the source data. They appear in the ranking and in search, but not on the map.
+- **Cross-check**: for 2023, the microdata match the API for operating loans in Minas Gerais (R$ 29,409,567,821 vs.
+  R$ 29,409,567,815; 120,342 contracts in both) and for the national totals (0.001% difference, due to later records).
 
-## Risco e inadimplência
-
-Aba própria no painel (`?aba=risco`), com duas fontes do Banco Central:
-
-- **SCR.data** ([dados abertos](https://dadosabertos.bcb.gov.br/dataset/scr_data)): arquivos anuais
-  `scrdata_{ANO}.zip`, com um CSV por mês desde jun/2012. Usa só a modalidade *Financiamentos rurais e
-  agroindustriais*. Dá carteira ativa, carteira inadimplida (operações com parcela vencida há mais de 90 dias),
-  vencido acima de 90 dias e ativo problemático, por UF, PF/PJ, submodalidade, porte, origem dos recursos e
-  segmento da instituição.
-- **SGS**: séries oficiais da inadimplência do crédito rural (recursos direcionados, atraso > 90 dias), nacionais:
-  21148 (PF), 21136 (PJ), 21146 (PF com taxas de mercado) e 21147 (PF com taxas reguladas).
-
-Limitações, exibidas também no app:
-- A modalidade do SCR.data junta crédito rural e financiamentos agroindustriais; o filtro de submodalidade ajuda a
-  separar as linhas.
-- Não há dado por município.
-- O SCR.data sai com cerca de 2 meses de defasagem e pode divergir de outras publicações do BCB.
-- O conceito de ativo problemático mudou em jan/2025.
-
-O ETL (`etl/inadimplencia_etl.py`, workflow `atualizar-inadimplencia.yml`) só baixa os anos cujo arquivo mudou
-e grava em `inad_meta.json` as submodalidades encontradas, para conferência.
-
-## Crédito × produção agrícola (PAM/IBGE)
-
-O painel cruza o crédito com a **Produção Agrícola Municipal** (IBGE, [SIDRA 5457](https://sidra.ibge.gov.br/tabela/5457)),
-que reúne lavouras temporárias e permanentes. A tabela 1612 tem só as temporárias e deixaria de fora café, laranja,
-banana e cacau.
-
-- **Mapa "Crédito × Produção"** com o quociente de localização:
-  QL = (crédito do município ÷ crédito da referência) ÷ (produção do município ÷ produção da referência).
-  A referência é o Brasil ou, com uma UF selecionada, a própria UF.
-- **Dispersão** crédito × produção por município (escala log), com a linha de QL = 1
-- **Indicadores**: R$ de crédito por R$ 100 produzidos, correlação de Spearman, % da produção em municípios sem crédito
-  agrícola e número de municípios com QL ≥ 2 ou < 0,5
-- **Por cultura**: fatia no valor da produção × fatia no custeio agrícola (soja, café, milho, cana…), com a
-  correspondência SICOR ↔ PAM definida em `etl/pam_etl.py`
-- Opção **"PAM do ano seguinte"**, porque o custeio de um ano financia em boa parte a safra colhida no seguinte
-
-Escolhas de método: só entra o crédito de **atividade agrícola**, porque a PAM não cobre pecuária. Os valores são
-nominais e do mesmo período. O QL mede proporção, não necessidade de crédito.
-
-## Arquitetura
+## Architecture
 
 ```mermaid
 flowchart LR
-  BCB[(API OData SICOR\nolinda.bcb.gov.br)]
-  GA[GitHub Actions\ncron diário]
-  ETL[etl/sicor_etl.py\ncoleta + agrega]
-  JSON[public/data/*.json\nagregados compactos]
-  VC[Vercel\nsite estático + CDN]
+  subgraph Sources
+    MD[(SICOR microdata)]
+    API[(SICOR API / Olinda)]
+    SCR[(SCR.data + SGS)]
+    PAM[(IBGE SIDRA 5457)]
+  end
+  GA[GitHub Actions\nscheduled]
+  ETL[Python ETLs\ncollect + aggregate]
+  JSON[public/data/*.json\ncompact aggregates]
+  VC[Vercel\nstatic site + CDN]
   FN[/api/municipio\n/api/status/]
-  UI[Dashboard React]
+  UI[React dashboard]
 
-  BCB --> ETL
+  MD & API & SCR & PAM --> ETL
   GA --> ETL --> JSON --> VC --> UI
-  UI -- município selecionado --> FN -- consulta ao vivo + cache --> BCB
+  UI -- selected municipality --> FN -- live query + cache --> API
 ```
 
-**Por que híbrido?** A API do SICOR é lenta (às vezes dezenas de segundos), devolve HTTP 500 de forma intermitente e um
-único mês da base municipal passa de 10 MB. Consultar tudo pelo navegador a cada filtro tornaria o painel inutilizável.
-Por isso:
+**Why hybrid?** The SICOR API is slow, intermittently returns HTTP 500, and a single month of municipal data exceeds
+10 MB. Querying everything from the browser would make the dashboard unusable. So the ETLs run on GitHub Actions,
+aggregate the data into compact JSON files and commit them to the repository; each commit triggers a new Vercel
+deployment. Only the municipality profile queries the BCB live, through serverless functions with CDN caching. The
+dashboard shows the date of the last sync and warns when the BCB has published a month it does not have yet.
 
-1. **ETL diário** (`etl/sicor_etl.py`, só biblioteca padrão do Python) consulta a API mês a mês, agrega e grava JSONs
-   compactos. Ele reconsulta os **3 meses mais recentes** a cada execução, porque os registros chegam com atraso.
-2. **Funções serverless** (`api/`) consultam o BCB **ao vivo** para o detalhe de um município e para o status da fonte,
-   com cache de CDN (6 h no ano corrente, 7 dias em anos fechados).
+### ETLs and workflows
 
-O dashboard mostra a data da última sincronização e avisa quando o BCB já publicou um mês que o painel ainda não tem.
+| Workflow | Script | Schedule | What it does |
+|---|---|---|---|
+| `atualizar-microdados.yml` | `etl/sicor_microdados_etl.py` | Daily | Downloads the monthly microdata (`.gz`) and builds the main dataset with DuckDB. Only reprocesses when a new file is available. |
+| `atualizar-dados.yml` | `etl/sicor_etl.py --complementar` | Daily | Fills in municipalities and sex from the API. Includes a circuit breaker: if the API is down, it stops in about 1 minute. |
+| `atualizar-inadimplencia.yml` | `etl/inadimplencia_etl.py` | Daily | Downloads the annual SCR.data files that changed and the SGS series. |
+| `atualizar-pam.yml` | `etl/pam_etl.py` | Weekly | Collects the PAM from SIDRA and reprocesses the 2 most recent years (IBGE revisions). |
 
-### Arquivos gerados (`public/data`)
+The two SICOR workflows share a concurrency group so they never write at the same time.
 
-| Arquivo | Conteúdo | Fonte (entidade OData) |
-|---|---|---|
-| `meta.json` | anos, meses disponíveis, dicionários | — |
-| `serie_anual.json` | ano × UF × atividade × programa | `RegiaoUF` |
-| `uf_AAAA.json` | mês × UF × atividade × programa × fonte | `RegiaoUF` |
-| `mun_AAAA.json` | município × atividade × programa (+ área) | `CusteioInvestimentoComercialIndustrialSemFiltros` |
-| `prod_AAAA.json` | UF × finalidade × produto × atividade × programa | `Custeio/Invest/ComercRegiaoUFProduto` |
-| `if_AAAA.json` | UF × instituição × segmento × atividade × programa | `SegmentoIFRegiaoUF` |
-| `gen_AAAA.json` | UF × sexo × atividade × programa | `RegiaoUFGenero` |
-| `pam_AAAA.json` | município × cultura (área colhida, valor da produção) + total | IBGE SIDRA 5457 |
-| `pam_meta.json` | anos da PAM e correspondência de culturas SICOR ↔ PAM | — |
+### Generated files (`public/data`)
 
-Cada linha traz quantidade e valor para as 4 finalidades.
+| File | Contents |
+|---|---|
+| `meta.json` | years, available months, dictionaries, data origin and municipal coverage by year |
+| `serie_anual.json` | year × state × activity × program |
+| `uf_AAAA.json` | month × state × activity × program × source |
+| `mun_AAAA.json` | municipality × activity × program (+ area) |
+| `prod_AAAA.json` | state × purpose × product × activity × program |
+| `if_AAAA.json` | state × institution × segment × activity × program |
+| `gen_AAAA.json` | state × sex × activity × program |
+| `municipios.json` | municipality names and IBGE codes (search) |
+| `pam_AAAA.json`, `pam_meta.json` | output by municipality and crop; SICOR ↔ PAM crop mapping |
+| `inad_uf.json`, `inad_dim.json`, `inad_sgs.json`, `inad_meta.json` | delinquency by state, national breakdowns, SGS series and metadata |
 
-## Como publicar (Vercel + GitHub)
+`AAAA` is the year. In the SICOR tables, each row holds the number of contracts and the amount for each of the 4 loan
+purposes.
 
-1. Crie um repositório (ex.: `Benfluc/painel-credito-rural`) e envie esta pasta:
-   ```bash
-   git init && git add . && git commit -m "Painel do Crédito Rural"
-   git branch -M main
-   git remote add origin https://github.com/Benfluc/painel-credito-rural.git
-   git push -u origin main
-   ```
-2. No GitHub, abra **Settings → Actions → General → Workflow permissions** e marque **Read and write permissions**
-   (o ETL faz commit dos dados).
-3. Em **Actions → "Atualizar dados do SICOR (microdados)" → Run workflow**, rode a primeira carga com `inicio = 2013`
-   (cerca de 1,3 GB de arquivos do BCB; leva de 15 a 40 minutos).
-   A carga completa leva de 1 a 3 horas, por causa da lentidão da API. Se cair no meio, rode de novo: o cache mensal
-   continua de onde parou.
-4. Em **Actions → "Atualizar dados da PAM (IBGE)" → Run workflow**, rode a carga da PAM. Ela leva alguns minutos e
-   depois roda toda segunda-feira.
-5. Na [Vercel](https://vercel.com/new), importe o repositório. O preset **Vite** é detectado sozinho e não precisa de
-   variáveis de ambiente. Cada commit do ETL gera um novo deploy.
-
-> Antes da primeira carga, o painel funciona em **modo amostra**: são respostas reais do BCB gravadas para teste
-> (estados 2022–2023; municípios e produtos só jan/2023), e um aviso amarelo fica visível no topo.
-
-## Rodando localmente
+## Running locally
 
 ```bash
 npm install
-npm run dev                     # http://localhost:5173  (sem /api: a consulta ao vivo tenta o BCB direto)
-npx vercel dev                  # inclui as funções /api
-python3 etl/sicor_etl.py --inicio 2023 --out public/data   # coleta real (precisa de acesso ao BCB)
+npm run dev                 # http://localhost:5173 (no /api: the live profile calls the BCB directly)
+npx vercel dev              # includes the /api functions
 ```
 
-Opções do ETL: `--inicio`, `--fim`, `--refresh N` (meses recentes a reconsultar), `--workers`, `--so-gerar`
-(só regenera os JSONs a partir do cache) e `--fixtures DIR` (lê respostas gravadas).
+Data collection (Python 3.12):
 
-## Metodologia e limites
+```bash
+pip install duckdb
+npm run etl                                   # SICOR microdata
+npm run etl:api                               # API complement
+npm run etl:pam                               # PAM/IBGE
+python3 etl/inadimplencia_etl.py --out public/data   # SCR.data + SGS
+```
 
-- Valores **nominais** (sem correção pela inflação), pela **data de emissão** do contrato.
-- **Programas agrupados**: Pronaf (0001), Pronamp (0050), Sem vínculo (0999), RenovAgro/ABC+ (0156, 0222, 0180) e Outros.
-- **Fontes agrupadas**: obrigatórios, poupança rural, LCA, livres, fundos constitucionais, BNDES/Finame e outras.
-- Fonte de recursos, produtos, instituições e sexo são publicados **por UF**. Ao escolher um município, esses gráficos
-  mostram o estado dele.
-- **Sexo do beneficiário**: códigos 1 e 2 tratados como masculino e feminino; demais códigos agrupados como
-  "PJ / não informado".
-- A malha municipal (IBGE, simplificada) não tem os municípios criados mais recentemente, e o polígono de Paraty (RJ)
-  está incompleto na base de origem. Esses municípios aparecem no ranking e na busca, mas não no mapa.
-- **Conferência**: com respostas reais da API, os totais de 2022 e 2023 por finalidade batem com a soma oficial
-  (contratos exatos; valores com diferença de poucos reais, por arredondamento).
+Useful options: `--inicio` and `--fim` (start and end years), `--dir-local` (use files already downloaded),
+`--forcar` (force microdata reprocessing), `--refresh N` and `--so-gerar` (API), `--sem-sgs` (delinquency).
+
+## Deploying your own copy
+
+1. Fork the project or push it to your own repository.
+2. Under **Settings → Actions → General → Workflow permissions**, select **Read and write permissions** (the ETLs commit
+   the data).
+3. Under **Actions**, run each workflow manually once for the first load. The microdata load downloads about 1.3 GB and
+   takes 15 to 40 minutes.
+4. On [Vercel](https://vercel.com/new), import the repository. The **Vite** preset is detected automatically and no
+   environment variables are needed.
 
 ## Stack
 
-React 18 · TypeScript · Vite · Tailwind CSS 4 · MapLibre GL · Recharts · Framer Motion · Vercel Functions · Python (ETL)
+React 18 · TypeScript · Vite · Tailwind CSS 4 · MapLibre GL · Recharts · Framer Motion · Vercel Functions ·
+Python · DuckDB · GitHub Actions
 
-## Créditos e licença
+## Credits and license
 
-- Dados: **Banco Central do Brasil**, licença [ODbL](https://opendatacommons.org/licenses/odbl/)
-- Malha municipal: IBGE, via [tbrugz/geodata-br](https://github.com/tbrugz/geodata-br)
-- Produção agrícola: **IBGE**, Produção Agrícola Municipal (SIDRA 5457)
-- Respostas de amostra da API: gravadas pelo projeto [agrobr](https://github.com/bruno-portfolio/agrobr)
-- Código: MIT, © Lúcio Júnio Benfica Rosa
+- Data: **Central Bank of Brazil** ([ODbL](https://opendatacommons.org/licenses/odbl/)) and **IBGE**
+- Municipal boundaries: IBGE, via [tbrugz/geodata-br](https://github.com/tbrugz/geodata-br)
+- Sample API responses for testing: the [agrobr](https://github.com/bruno-portfolio/agrobr) project
+- Code: [MIT](LICENSE), © Lúcio Júnio Benfica Rosa
